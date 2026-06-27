@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Environments
+.venv/
+venv/
+env/
+
+# Data and artifacts
+data/
+outputs/*
+!outputs/.gitkeep
+*.pth
+*.pt
+*.ckpt
+
+# OS / editor
+.DS_Store
+.idea/
+
+# Tooling caches
+.ruff_cache/
+
+# Keep shared VSCode config, ignore the rest
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json

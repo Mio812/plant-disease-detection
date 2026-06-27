@@ -1,0 +1,25 @@
+seed: 42
+output_dir: outputs
+
+data:
+  root: data/PlantVillage/raw/color
+  image_size: 128
+  val_split: 0.15
+  test_split: 0.15
+  batch_size: 64
+  num_workers: 4
+
+model:
+  name: resnet18          # custom_cnn | resnet18 | mobilenet_v2
+  pretrained: true
+
+train:
+  epochs: 30
+  lr: 0.001
+  weight_decay: 0.0001
+  label_smoothing: 0.1
+  early_stop_patience: 7
+
+severity:
+  thresholds: [0.05, 0.20, 0.50]
+  levels: [healthy, mild, moderate, severe]

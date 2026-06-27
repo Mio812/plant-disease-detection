@@ -1,0 +1,62 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Train (scripts.train)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.train",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "justMyCode": false,
+      "args": ["--config", "configs/default.yaml"]
+    },
+    {
+      "name": "Evaluate (scripts.evaluate)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.evaluate",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "justMyCode": false,
+      "args": ["--config", "configs/default.yaml", "--checkpoint", "outputs/resnet18_best.pth"]
+    },
+    {
+      "name": "Predict (scripts.predict)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.predict",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "justMyCode": false,
+      "args": [
+        "--config", "configs/default.yaml",
+        "--checkpoint", "outputs/resnet18_best.pth",
+        "--classes", "outputs/resnet18_history.json",
+        "--image", "${input:imagePath}"
+      ]
+    },
+    {
+      "name": "Download data (scripts.download_data)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scripts.download_data",
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "justMyCode": false,
+      "args": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "imagePath",
+      "type": "promptString",
+      "description": "Path to the leaf image to classify",
+      "default": "data/PlantVillage/raw/color/Tomato___healthy/example.jpg"
+    }
+  ]
+}
