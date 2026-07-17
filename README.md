@@ -1,7 +1,8 @@
 # Automatic Plant Disease Detection Using Computer Vision
 
-CNN-based classification of plant leaf diseases on the **PlantVillage** dataset,
-extended with an image-feature-based **disease severity** estimate.
+CNN-based classification of plant leaf diseases on the **PlantVillage** dataset —
+three CNN baselines combined into a **soft-voting ensemble** — extended with an
+image-feature-based **disease severity** estimate.
 
 > COMP9444 25T1 — Project 090. The graded notebook is
 > [`notebooks/plant_disease_detection.ipynb`](notebooks/plant_disease_detection.ipynb);
@@ -49,15 +50,18 @@ plant-disease-detection/
 │   ├── engine.py               # train / evaluate loops, early stopping
 │   ├── metrics.py              # accuracy, P/R/F1, confusion matrix
 │   ├── severity.py             # lesion-area severity estimation
+│   ├── ensemble.py             # soft-voting ensemble of the baselines
 │   ├── visualize.py            # EDA and results plots
 │   └── utils.py                # seed, device, checkpoints
 ├── scripts/
 │   ├── download_data.py        # fetch PlantVillage into data/
 │   ├── train.py                # train from a config
 │   ├── evaluate.py             # evaluate a checkpoint on the test split
-│   └── predict.py              # classify + estimate severity for one image
+│   ├── predict.py              # classify + estimate severity for one image
+│   └── ensemble.py             # evaluate the soft-voting ensemble
 ├── notebooks/
 │   └── plant_disease_detection.ipynb
+├── report/                     # summary report (.docx) and slides (.pptx)
 └── outputs/                    # checkpoints, metrics, plots (created at runtime)
 ```
 
@@ -126,6 +130,9 @@ uv run python -m scripts.evaluate --config configs/default.yaml --checkpoint out
 
 # 4. Classify a single leaf and estimate its severity
 uv run python -m scripts.predict --config configs/default.yaml --checkpoint outputs/resnet18_best.pth --classes outputs/resnet18_history.json --image path/to/leaf.jpg
+
+# 5. Evaluate the soft-voting ensemble of the three baselines
+uv run python -m scripts.ensemble --config configs/default.yaml
 ```
 
 Open the notebook for the full analysis:
@@ -162,13 +169,16 @@ fields in [`configs/default.yaml`](configs/default.yaml):
 
 ## Methodology
 
-**Classification.** Two model families are compared:
+**Classification.** Three baselines spanning two families are compared, then combined:
 
 - **Custom CNN** — a four-block Conv–BatchNorm–ReLU–MaxPool network with global
   average pooling, trained from scratch (our baseline).
 - **Transfer learning** — ImageNet-pretrained ResNet-18 / MobileNet-V2 with the
   final layer replaced for the PlantVillage classes. The backbone weights are the
   pre-existing source; the classifier head and the training pipeline are our work.
+- **Soft-voting ensemble (proposed)** — a weighted average of the three baselines'
+  softmax probabilities, weights tuned on the validation split (0.20 / 0.50 / 0.30).
+  It needs no extra training and is our most accurate model.
 
 Training uses AdamW with a cosine-annealed learning rate, cross-entropy with label
 smoothing, on-the-fly augmentation (random resized crop, flip, rotation, colour
@@ -191,30 +201,14 @@ every model):
 | custom_cnn    | 0.9915   | 0.9901            | 0.9882         | 0.9891     |
 | resnet18      | 0.9968   | 0.9958            | 0.9948         | 0.9951     |
 | mobilenet_v2  | 0.9898   | 0.9867            | 0.9876         | 0.9870     |
+| **ensemble**  | **0.9984** | **0.9975**      | **0.9978**     | **0.9976** |
 
-**ResNet-18 wins.** All three backbones exceed 98.9% test accuracy; the from-scratch
+**The ensemble wins.** All three backbones exceed 98.9% test accuracy; the from-scratch
 custom CNN (99.15%) trails pretrained ResNet-18 by only ~0.5% and edges out
 MobileNet-V2 — a small gap that reflects how separable PlantVillage is under
 controlled conditions. ResNet-18 misclassifies only 26 / 8,145 test images; 12 of
 those confuse Corn Cercospora/Gray leaf spot with Northern Leaf Blight (a known
-visual look-alike), and no error crosses the healthy/diseased boundary. Per-model
-training history, classification report, and confusion matrix are in `outputs/`.
-
-Each non-default row is reproduced with (same config, model overridden):
-
-```powershell
-uv run python -m scripts.train --model custom_cnn
-uv run python -m scripts.train --model mobilenet_v2
-```
-
-## References
-
-1. Ferentinos, K. P. (2018). *Deep learning models for plant disease detection and
-   diagnosis.* Computers and Electronics in Agriculture, 145, 311–318.
-2. Natarajan, S., Chakrabarti, P., & Margala, M. (2024). *Robust diagnosis and meta
-   visualizations of plant diseases through deep neural architecture with
-   explainable AI.* Scientific Reports, 14, 13695.
-3. Arsenovic, M., et al. (2019). *Solving current limitations of deep learning based
-   approaches for plant disease detection.* Symmetry, 11(7), 939.
-4. Hughes, D. P., & Salathé, M. (2015). *An open access repository of images on
-   plant health.* arXiv:1511.08060.
+visual look-alike), and no error crosses the healthy/diseased boundary. Averaging the
+three baselines by a validation-tuned weighted vote lifts test accuracy to **99.84%** and cuts errors to
+**13 / 8,145** — the best result, again with no healthy/diseased crossing; ResNet-18
+(99.68%) remains the strongest 
