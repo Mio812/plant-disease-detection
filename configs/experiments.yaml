@@ -144,6 +144,60 @@ stages:
           --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
           --shots, "0", --epochs, "${ft_epochs}", --tag, ft_full]
 
+  # E11 control. ft_robust and ft_baseline start from checkpoints that differ in
+  # resolution, augmentation AND background randomisation, so their gap is not
+  # attributable to any one of them. This arm differs from ft_robust in p_random only.
+  - id: finetune_aug_only
+    experiment: E11 control
+    produces: outputs/ft_aug_only_history.json
+    requires: [outputs/resnet18_color_strong_p0_224_best.pth, data/PlantDoc/.complete]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p0_224_best.pth,
+          --shots, "20", --epochs, "${ft_epochs}", --tag, ft_aug_only]
+
+  # E17: factorised crop-then-disease head, matched to train_bg_random in every
+  # other respect so the head is the only variable.
+  - id: train_hier
+    experiment: E17
+    produces: outputs/resnet18_color_strong_p70_224_hier_history.json
+    requires: [data/PlantVillage/raw/segmented]
+    run: [train, --model, resnet18, --augment, strong, --p-random, "0.7",
+          --head, hierarchical,
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: eval_arm_hier
+    experiment: E17
+    produces: outputs/eval_arm_hier.json
+    requires: [outputs/resnet18_color_strong_p70_224_hier_best.pth, data/PlantDoc/.complete]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --image-size, "${image_size}", --models, resnet18,
+          --checkpoints, outputs/resnet18_color_strong_p70_224_hier_best.pth,
+          --out, outputs/eval_arm_hier.json]
+
+  - id: sweep_shots_5
+    experiment: E18
+    produces: outputs/ft_shots5_history.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
+          --shots, "5", --epochs, "${ft_epochs}", --tag, ft_shots5]
+
+  - id: sweep_shots_50
+    experiment: E18
+    produces: outputs/ft_shots50_history.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
+          --shots, "50", --epochs, "${ft_epochs}", --tag, ft_shots50]
+
+  - id: sweep_shots_100
+    experiment: E18
+    produces: outputs/ft_shots100_history.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
+          --shots, "100", --epochs, "${ft_epochs}", --tag, ft_shots100]
+
   # Score each 224 arm on full PlantDoc with the crop / disease / restricted breakdown.
   # --image-size is mandatory: these checkpoints are 224, the config default is 128.
 

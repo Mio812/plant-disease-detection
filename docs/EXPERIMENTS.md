@@ -34,7 +34,24 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **open — needs training** |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
-| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | open |
+| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **partly rejected** — it ties, it does not win |
+| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | open |
+
+### The clearest single result: 574x the parameters, no field gain
+
+E15 trains only the 19,494-parameter head and leaves all 11.2M backbone weights
+at their ImageNet values. The matched full fine-tune updates everything.
+
+| Arm | Trainable | PlantVillage | PlantDoc |
+|---|---|---|---|
+| Full fine-tune, strong aug (E8 control) | 11,196,006 | 99.52% | 23.73% |
+| Frozen backbone, strong aug (E15 control) | 19,494 (0.17%) | 91.70% | 24.15% |
+
+Fine-tuning 574x more parameters buys 7.8 points on PlantVillage and nothing at
+all in the field. H8 predicted the frozen arm would *win*; it ties, so H8 is
+recorded as partly rejected. The tie is the stronger statement: it isolates those
+7.8 points as entirely benchmark-specific, using a direct control rather than the
+indirect evidence of E3 and E5. The two accuracies are decoupled.
 
 ### What the field accuracy is actually made of
 
@@ -102,12 +119,14 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E8 | Background randomisation, p ∈ {0.0, 0.7, 1.0} | H5 | **p = 0.0 is the control**: isolates de-shortcutting from stronger augmentation | open |
 | E9 | Train on `segmented` | H5, control for E4 | removes E4's domain-shift confound | open |
 | E10 | Train on `grayscale` | colour-cue ablation | third variant named in the brief | open |
-| E11 | Few-shot fine-tune on PlantDoc train | supervised ceiling | **reported separately** — touches target labels | open |
+| E11 | Few-shot fine-tune on PlantDoc train | supervised ceiling | **reported separately** — touches target labels | partial |
 | E12 | Leaf segmentation vs official masks (Dice) | H6 | official mask is ground truth | done |
 | E13 | Lesion ratio separates healthy vs diseased (ROC-AUC) | H6 | needs no manual labels | done |
 | E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, graded by the team | open |
 | E15 | Frozen backbone vs full fine-tune, crossed with `p ∈ {0.0, 0.7}` | H8 | 2x2 factorial: separates both main effects and their interaction | open |
 | E16 | Crop / disease / restricted decomposition of every 224 arm | H7 | scored on all 2,525 PlantDoc images, not the 236-image split | open |
+| E17 | Factorised crop-then-disease head | H9 | matched to E8 in every respect but the head | open |
+| E18 | Adaptation curve at 5 / 20 / 50 / 100 / all shots | supervised ceiling | one point is not a curve; shows how much field data is actually needed | open |
 
 ## 4. What would falsify the conclusions
 
@@ -143,13 +162,17 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 2. A drop in PlantVillage accuracy when the shortcut is removed is expected and
    is *not* a regression — it is the price of generalisation.
 3. E11 never shares a row with zero-shot numbers.
-4. Field accuracy is reported over the full 38-class output space as the headline,
+4. `ft_robust` (48.73%) and `ft_baseline` start from checkpoints differing in
+   resolution, augmentation *and* background randomisation, so their gap is not
+   evidence for any one of them. `ft_aug_only` differs from `ft_robust` in
+   `p_random` alone and is the arm the E11 claim rests on.
+5. Field accuracy is reported over the full 38-class output space as the headline,
    with the 27-class restricted figure alongside it. Restriction assumes the
    deployment knows which crops are planted, which is realistic but is an
    assumption, so it never replaces the unrestricted number.
-5. PlantDoc is web-scraped: a small number of its JPEGs are truncated, and PIL is
+6. PlantDoc is web-scraped: a small number of its JPEGs are truncated, and PIL is
    configured to load them rather than abort. Roughly 4% of the repository's file
    names are also invalid on NTFS and are excluded on Windows.
-6. Known threats to validity: PlantDoc carries label noise;
+7. Known threats to validity: PlantDoc carries label noise;
    its train/test splits are known to differ in content; our field evaluation is
    236 images (±5 points), so the full-dataset variant is also reported.

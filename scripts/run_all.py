@@ -80,7 +80,8 @@ def summarise(out_dir):
                        ("resnet18_grayscale_strong_p0_224", "Trained on grayscale (E10)"),
                        ("resnet50_color_strong_p70_224", "ResNet-50, p=0.7 (E8)"),
                        ("resnet18_color_strong_p0_224_frozen", "Frozen backbone (E15 control)"),
-                       ("resnet18_color_strong_p70_224_frozen", "Frozen backbone + bg random (E15)")]:
+                       ("resnet18_color_strong_p70_224_frozen", "Frozen backbone + bg random (E15)"),
+                       ("resnet18_color_strong_p70_224_hier", "Hierarchical head, p=0.7 (E17)")]:
         d = read(out_dir / f"{tag}_history.json")
         if not d:
             continue
@@ -93,7 +94,9 @@ def summarise(out_dir):
                      f"{d['plantdoc_accuracy']:.2f}" if d.get("plantdoc_accuracy") else "-"])
 
     for tag, label in [("ft_robust", "Fine-tuned 20-shot from robust (E11)"),
-                       ("ft_baseline", "Fine-tuned 20-shot from baseline (E11)")]:
+                       ("ft_aug_only", "Fine-tuned 20-shot from aug-only (E11 control)"),
+                       ("ft_baseline", "Fine-tuned 20-shot from baseline (E11)"),
+                       ("ft_full", "Fine-tuned on all PlantDoc train (E11)")]:
         d = read(out_dir / f"{tag}_history.json")
         if d:
             rows.append([label, "-", "-", f"{d['best']:.2f} (from {d['before']:.2f})"])
@@ -142,6 +145,17 @@ def summarise(out_dir):
         lines.append("| " + " | ".join(h.ljust(w[i]) for i, h in enumerate(head)) + " |")
         lines.append("|" + "|".join("-" * (x + 2) for x in w) + "|")
         lines += ["| " + " | ".join(r[i].ljust(w[i]) for i in range(6)) + " |" for r in brows]
+
+    # E18: how much field data does adaptation actually need?
+    sweep = []
+    for shots, tag in [(5, "ft_shots5"), (20, "ft_robust"), (50, "ft_shots50"),
+                       (100, "ft_shots100"), ("all", "ft_full")]:
+        d = read(out_dir / f"{tag}_history.json")
+        if d:
+            sweep.append(f"{shots}-shot {d['best']:.2f}%")
+    if sweep:
+        extra.append("E18 adaptation curve from the robust checkpoint: "
+                     + ", ".join(sweep))
 
     text = "\n".join(lines) + ("\n\n" + "\n".join(extra) if extra else "") + "\n"
     (out_dir / "results_summary.md").write_text(text, encoding="utf-8")
