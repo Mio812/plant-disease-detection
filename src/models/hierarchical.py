@@ -16,7 +16,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .factory import build_model
+from .factory import build_model, strip_head
 
 MASKED = -1e9
 
@@ -31,13 +31,7 @@ def crop_of(classes):
 def _strip_head(name, pretrained):
     """Return the backbone as a feature extractor plus its feature dimension."""
     model = build_model(name, 1, pretrained=pretrained)
-    if hasattr(model, "fc"):
-        dim = model.fc.in_features
-        model.fc = nn.Identity()
-    else:
-        dim = model.classifier[-1].in_features
-        model.classifier[-1] = nn.Identity()
-    return model, dim
+    return model, strip_head(model)
 
 
 class HierarchicalClassifier(nn.Module):

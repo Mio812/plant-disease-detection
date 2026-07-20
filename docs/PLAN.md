@@ -54,13 +54,17 @@ Run strictly in sequence. Each phase gates the next.
 - [x] fix the order in this file
 - [ ] draft the lesion-ratio caching pass in the scratchpad, ready to install
 
-**Phase 1 — the moment the queue drains. Decide from the data before building.**
-- [ ] read the five `eval_arm_*` artefacts; settle **H9** (`eval_arm_hier` against
-      `eval_arm_bg_random`, crop accuracy, 2,525 basis only) and whether **E8's
-      +0.42 survives** at ±1.7pp
-- [ ] record both outcomes in `EXPERIMENTS.md` and here, whichever way they fall
-- [ ] install the deferred patches, and per-image predictions in `evaluate.py`
-- [ ] McNemar on the paired arms, as pre-registered in a023841
+**Phase 1 — done.** The nine-stage queue finished in 162 min.
+- [x] five `eval_arm_*` artefacts read on the 2,525 basis
+- [x] **H8 corrected to confirmed** (046cd36, b5af615). The n = 236 "tie" was
+      underpowered; freezing wins, crop p = 2.1e-08
+- [x] **H5 corrected to confirmed.** Recorded as null on +0.42 at n = 236; it is
+      p = 0.0027 on 38-way and p = 5.2e-05 on crop once measured on the
+      pre-specified basis with the pre-specified test
+- [x] **H9 magnitude rejected** — crop +1.74, p = 0.014 raw, fails Bonferroni
+- [x] deferred patches applied (39da42a); float32 measured at 4.50 → 2.25 MiB,
+      and the generator switch buys nothing over the stream-preserving cast
+- [x] `--save-predictions`, `mcnemar()`, and the `paired` probe (b5af615)
 
 **Phase 2 — core task 2, the weakest half.**
 - [ ] cache lesion ratios for all 54,305 images from the official masks

@@ -70,6 +70,27 @@ def freeze_backbone(model, name):
     return model
 
 
+def strip_head(model):
+    """Replace the final Linear with Identity, returning its input width.
+
+    Families disagree on head layout: resnet and regnet expose ``fc`` as a bare
+    Linear, convnext and efficientnet wrap one inside ``classifier``, densenet uses
+    a bare Linear there. Searching for the last Linear covers all of them.
+    """
+    for attr in ("fc", "classifier", "head"):
+        head = getattr(model, attr, None)
+        if isinstance(head, nn.Linear):
+            setattr(model, attr, nn.Identity())
+            return head.in_features
+        if isinstance(head, nn.Sequential):
+            for i in range(len(head) - 1, -1, -1):
+                if isinstance(head[i], nn.Linear):
+                    width = head[i].in_features
+                    head[i] = nn.Identity()
+                    return width
+    raise ValueError(f"no final Linear in {type(model).__name__}")
+
+
 def trainable_parameters(model):
     total = sum(p.numel() for p in model.parameters())
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
