@@ -31,7 +31,7 @@ stages:
   - id: eval_segmented
     experiment: E4
     produces: outputs/eval_segmented.json
-    requires: [outputs/resnet18_best.pth]
+    requires: [outputs/resnet18_best.pth, data/PlantVillage/raw/segmented]
     run: [evaluate, --on, segmented, --weights, "${weights}"]
 
   - id: gradcam
@@ -72,18 +72,21 @@ stages:
   - id: train_bg_random
     experiment: E8
     produces: outputs/resnet18_color_strong_p70_224_history.json
+    requires: [data/PlantVillage/raw/segmented]
     run: [train, --model, resnet18, --augment, strong, --p-random, "0.7",
           --image-size, "${image_size}", --epochs, "${epochs}"]
 
   - id: train_segmented
     experiment: E9
     produces: outputs/resnet18_segmented_strong_p0_224_history.json
+    requires: [data/PlantVillage/raw/segmented]
     run: [train, --model, resnet18, --variant, segmented, --augment, strong,
           --image-size, "${image_size}", --epochs, "${epochs}"]
 
   - id: train_grayscale
     experiment: E10
     produces: outputs/resnet18_grayscale_strong_p0_224_history.json
+    requires: [data/PlantVillage/raw/grayscale]
     run: [train, --model, resnet18, --variant, grayscale, --augment, strong,
           --image-size, "${image_size}", --epochs, "${epochs}"]
 

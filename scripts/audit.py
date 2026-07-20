@@ -130,7 +130,7 @@ def probe_severity(cfg, args):
     chosen = ([(i, 0) for i in rng.sample(healthy_idx, min(args.n, len(healthy_idx)))] +
               [(i, 1) for i in rng.sample(diseased_idx, min(args.n, len(diseased_idx)))])
 
-    index, rows, dices = {}, [], []
+    index, rows = {}, []
     for i, is_diseased in chosen:
         path, label = base.samples[i]
         image = cv2.imread(path)
@@ -228,6 +228,8 @@ def main():
     parser.add_argument("--per-class-train", type=int, default=100)
     parser.add_argument("--per-class-test", type=int, default=50)
     parser.add_argument("--csv", default="outputs/severity_annotations.csv")
+    parser.add_argument("--out", default=None,
+                        help="override the output filename (use for smoke tests)")
     args = parser.parse_args()
 
     cfg = Config.load(args.config)
@@ -235,7 +237,7 @@ def main():
     print(f"probe: {args.probe}")
     filename, summary = PROBES[args.probe](cfg, args)
     if filename:
-        out = Path(cfg.output_dir) / filename
+        out = Path(args.out) if args.out else Path(cfg.output_dir) / filename
         out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
         print(f"  saved {out.as_posix()}")
 

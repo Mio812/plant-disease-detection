@@ -11,7 +11,6 @@ rather than leaf pathology:
   background.
 """
 
-import os
 
 BORDER_POSITIONS = [(0, 0), (16, 0), (31, 0), (0, 16), (31, 16), (0, 31), (16, 31), (31, 31)]
 

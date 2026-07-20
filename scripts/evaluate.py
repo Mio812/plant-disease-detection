@@ -16,6 +16,8 @@ import argparse
 import json
 from pathlib import Path
 
+import torch
+
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
@@ -93,12 +95,11 @@ def main():
         model = load_model(name, len(classes), out_dir / f"{name}_best.pth", device)
         member, targets = predict_loader(model, loader, device, tta=args.tta)
         probs.append(member)
-        correct = int((member.argmax(1) == __import__("torch").tensor(targets)).sum())
+        correct = int((member.argmax(1) == torch.tensor(targets)).sum())
         low, high = wilson_interval(correct, n)
         results[name] = round(100.0 * correct / n, 2)
         print(f"  {name:14s} {results[name]:6.2f}%   95% CI [{low * 100:.1f}, {high * 100:.1f}]")
 
-    import torch
     y = torch.tensor(targets)
     ensemble = combine(probs, args.weights)
     y_pred = ensemble.argmax(1)

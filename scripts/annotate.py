@@ -12,7 +12,7 @@ Usage:
 import argparse
 import csv
 import shutil
-from pathlib import Path
+from pathlib import Path, PurePath
 
 from src.config import Config
 
@@ -68,8 +68,8 @@ def package(args):
             writer = csv.writer(f)
             writer.writerow(["image", "class", "manual_grade"])
             for row in shard:
-                source = Path(row["path"])
-                name = f"{Path(row['path']).stem}.jpg"
+                source = Path(row["path"].replace("\\", "/"))
+                name = f"{source.stem}.jpg"
                 shutil.copy2(source, folder / "images" / name)
                 writer.writerow([name, row["class"], ""])
         print(f"  {folder.as_posix()}: {len(shard)} images")
@@ -90,7 +90,7 @@ def merge(args):
     rows = list(csv.DictReader(open(args.master, encoding="utf-8")))
     filled = 0
     for row in rows:
-        key = f"{Path(row['path']).stem}.jpg"
+        key = f"{Path(row['path'].replace(chr(92), '/')).stem}.jpg"
         if key in grades:
             row["manual_grade"] = grades[key]
             filled += 1
