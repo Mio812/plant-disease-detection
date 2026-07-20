@@ -32,7 +32,10 @@ from src.data import (
     variant_samples,
 )
 from src.evaluation import full_report
-from src.models import build_model, freeze_backbone, trainable_parameters
+from src.models import (
+    HierarchicalClassifier, LogProbLoss, build_model, crop_of,
+    freeze_backbone, trainable_parameters,
+)
 from src.training import BackgroundRandomised, build_strong_transforms, evaluate, fit
 from src.utils import get_device, set_seed
 
@@ -50,6 +53,8 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=None)
     parser.add_argument("--freeze-backbone", action="store_true",
                         help="train only the classification head (linear probe)")
+    parser.add_argument("--head", choices=["flat", "hierarchical"], default="flat",
+                        help="hierarchical factorises p(class) into p(crop) p(class|crop)")
     parser.add_argument("--plantdoc", default="data/PlantDoc/test")
     parser.add_argument("--tag", default=None)
     return parser.parse_args()
@@ -59,9 +64,11 @@ def resolve_tag(args, cfg):
     if args.tag:
         return args.tag
     if (args.variant == "color" and args.augment == "standard"
-            and args.p_random == 0.0 and not args.freeze_backbone):
+            and args.p_random == 0.0 and not args.freeze_backbone
+            and args.head == "flat"):
         return cfg.model.name
-    suffix = "_frozen" if args.freeze_backbone else ""
+    suffix = ("_hier" if args.head == "hierarchical" else "") + \
+             ("_frozen" if args.freeze_backbone else "")
     return (f"{cfg.model.name}_{args.variant}_{args.augment}"
             f"_p{int(args.p_random * 100)}_{cfg.data.image_size}{suffix}")
 
@@ -110,7 +117,13 @@ def main():
     print(f"[{tag}] variant={args.variant} augment={args.augment} p_random={args.p_random} "
           f"size={cfg.data.image_size} | train={len(train_ds)}")
 
-    model = build_model(cfg.model.name, len(classes), cfg.model.pretrained).to(device)
+    if args.head == "hierarchical":
+        crop_index, crops = crop_of(classes)
+        model = HierarchicalClassifier(cfg.model.name, crop_index, cfg.model.pretrained)
+        print(f"[{tag}] hierarchical head: {len(crops)} crops x {len(classes)} classes")
+    else:
+        model = build_model(cfg.model.name, len(classes), cfg.model.pretrained)
+    model = model.to(device)
     if args.freeze_backbone:
         if not cfg.model.pretrained:
             raise SystemExit("--freeze-backbone needs pretrained weights to probe")
@@ -119,7 +132,8 @@ def main():
     print(f"[{tag}] trainable {trainable:,} / {total:,} parameters "
           f"({100.0 * trainable / total:.2f}%)")
 
-    criterion = nn.CrossEntropyLoss(label_smoothing=cfg.train.label_smoothing)
+    criterion = (LogProbLoss(cfg.train.label_smoothing) if args.head == "hierarchical"
+                 else nn.CrossEntropyLoss(label_smoothing=cfg.train.label_smoothing))
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                                   lr=cfg.train.lr, weight_decay=cfg.train.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.train.epochs)
@@ -149,7 +163,8 @@ def main():
         json.dump({"history": history, "test_metrics": test_metrics,
                    "plantdoc_accuracy": field_acc, "variant": args.variant,
                    "augment": args.augment, "p_random": args.p_random,
-                   "frozen_backbone": args.freeze_backbone, "lr": cfg.train.lr,
+                   "frozen_backbone": args.freeze_backbone, "head": args.head,
+                   "lr": cfg.train.lr,
                    "trainable_parameters": trainable, "total_parameters": total,
                    "image_size": cfg.data.image_size, "classes": classes}, f, indent=2)
 

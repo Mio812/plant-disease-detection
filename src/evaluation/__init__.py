@@ -5,6 +5,7 @@ from .inference import (
     load_model,
     predict_loader,
     predict_tensor,
+    to_probs,
 )
 from .metrics import compute_metrics, confusion, full_report
 from .visualize import (
@@ -14,6 +15,6 @@ from .visualize import (
     show_samples,
 )
 
-__all__ = ["load_model", "predict_loader", "predict_tensor", "enable_batchnorm_adaptation",
+__all__ = ["load_model", "predict_loader", "to_probs", "predict_tensor", "enable_batchnorm_adaptation",
            "compute_metrics", "confusion", "full_report",
            "plot_class_distribution", "plot_confusion_matrix", "plot_history", "show_samples"]

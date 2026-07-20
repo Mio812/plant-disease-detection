@@ -48,11 +48,13 @@ def freeze_backbone(model, name):
     they would absorb PlantVillage's uniform-background statistics, which is exactly
     the domain information this arm is meant to exclude.
     """
-    head = HEADS[name.lower()]
+    heads = (["crop_head", "disease_head"] if hasattr(model, "crop_head")
+             else [HEADS[name.lower()]])
     for param in model.parameters():
         param.requires_grad = False
-    for param in getattr(model, head).parameters():
-        param.requires_grad = True
+    for head in heads:
+        for param in getattr(model, head).parameters():
+            param.requires_grad = True
 
     original_train = model.train
 
