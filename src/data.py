@@ -113,25 +113,30 @@ class ItemDataset(Dataset):
         return self.transform(Image.open(path).convert("RGB")), label
 
 
-def variant_samples(base, indices, variant, segmented_root):
+def variant_samples(base, indices, variant, variant_root):
     """Map dataset indices onto another PlantVillage variant.
 
-    The split is always derived from the colour ImageFolder so that every
-    variant sees exactly the same physical leaves; segmented filenames differ,
-    so they are matched on the original-name key.
+    The split is always derived from the colour ImageFolder so every variant
+    sees exactly the same physical leaves. Filenames differ between variants
+    (UUID prefixes, ``_final_masked`` suffixes), so they are matched on the
+    original-name key rather than on the path.
     """
     from .bias import name_key, segmented_index
 
     if variant == "color":
         return [base.samples[i] for i in indices]
-    index = {}
-    items = []
+    index, items = {}, []
     for i in indices:
         path, label = base.samples[i]
         class_name = base.classes[label]
         if class_name not in index:
-            index[class_name] = segmented_index(segmented_root, class_name)
+            index[class_name] = segmented_index(variant_root, class_name)
         twin = index[class_name].get(name_key(Path(path).name))
         if twin is not None:
             items.append((twin, label))
     return items
+
+
+def variant_root(colour_root, variant):
+    """Path of a sibling PlantVillage variant directory."""
+    return str(Path(colour_root).parent / variant)

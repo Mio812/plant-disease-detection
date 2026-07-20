@@ -67,8 +67,10 @@ plant-disease-detection/
 │   ├── bias_probe.py           # predict the class from background pixels alone
 │   ├── eval_segmented.py       # re-score models with the background removed
 │   ├── eval_plantdoc.py        # zero-shot evaluation on field images
+│   ├── severity_probe.py       # severity validation without manual labels
 │   ├── severity_sample.py      # sample leaves for manual severity grading
-│   └── severity_validate.py    # score severity against manual grades
+│   ├── severity_validate.py    # score severity against manual grades
+│   └── gradcam.py              # Grad-CAM plus leaf-attention audit
 ├── notebooks/
 │   └── plant_disease_detection.ipynb
 ├── report/                     # summary report (.docx) and slides (.pptx)
@@ -154,6 +156,10 @@ uv run python -m scripts.eval_plantdoc       # zero-shot on field images
 uv run python -m scripts.run_all --dry-run   # show the plan
 uv run python -m scripts.run_all --quick     # 2-epoch smoke test (isolated in outputs_quick/)
 uv run python -m scripts.run_all             # full run; re-run to resume after an interruption
+
+# 6c. Explainability and label-free severity validation
+uv run python -m scripts.gradcam --model resnet18 --n 60
+uv run python -m scripts.severity_probe --n 150
 
 # 7. Severity: sample for grading, then validate against manual grades
 uv run python -m scripts.severity_sample --n 150

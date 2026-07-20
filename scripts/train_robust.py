@@ -27,7 +27,7 @@ from torchvision.datasets import ImageFolder
 from src.augment import BackgroundRandomised, build_strong_transforms
 from src.config import Config
 from src.crossdata import plantdoc_items
-from src.data import ItemDataset, build_transforms, variant_samples
+from src.data import ItemDataset, build_transforms, variant_root, variant_samples
 from src.engine import evaluate, fit
 from src.metrics import full_report
 from src.models import build_model
@@ -38,7 +38,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Robust training against the background shortcut.")
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--model", default="resnet18")
-    parser.add_argument("--variant", choices=["color", "segmented"], default="color")
+    parser.add_argument("--variant", choices=["color", "grayscale", "segmented"], default="color")
     parser.add_argument("--image-size", type=int, default=None)
     parser.add_argument("--p-random", type=float, default=0.7)
     parser.add_argument("--epochs", type=int, default=None)
@@ -53,13 +53,14 @@ def main():
         cfg.data.image_size = args.image_size
     if args.epochs:
         cfg.train.epochs = args.epochs
-    if args.variant == "segmented":
+    if args.variant != "color":
         args.p_random = 0.0
     set_seed(cfg.seed)
     device = get_device()
 
     base = ImageFolder(cfg.data.root)
-    segmented_root = cfg.data.root.replace("/color", "/segmented")
+    segmented_root = variant_root(cfg.data.root, "segmented")
+    active_root = variant_root(cfg.data.root, args.variant)
     n = len(base)
     n_test = int(n * cfg.data.test_split)
     n_val = int(n * cfg.data.val_split)
@@ -67,11 +68,11 @@ def main():
     test_idx, val_idx, train_idx = perm[:n_test], perm[n_test:n_test + n_val], perm[n_test + n_val:]
 
     eval_tf = build_transforms(cfg.data.image_size, train=False)
-    val_items = variant_samples(base, val_idx, args.variant, segmented_root)
-    test_items = variant_samples(base, test_idx, args.variant, segmented_root)
+    val_items = variant_samples(base, val_idx, args.variant, active_root)
+    test_items = variant_samples(base, test_idx, args.variant, active_root)
 
-    if args.variant == "segmented":
-        train_ds = ItemDataset(variant_samples(base, train_idx, "segmented", segmented_root),
+    if args.variant != "color":
+        train_ds = ItemDataset(variant_samples(base, train_idx, args.variant, active_root),
                                build_strong_transforms(cfg.data.image_size))
     else:
         train_ds = BackgroundRandomised([base.samples[i] for i in train_idx], base.classes,

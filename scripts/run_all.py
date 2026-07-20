@@ -40,6 +40,10 @@ def stages(epochs, ft_epochs, full_ablation):
         ("plantdoc_test", "outputs/plantdoc_test.json", ["data/PlantDoc/test"],
          ["eval_plantdoc", "--weights", *W, "--plantdoc", "data/PlantDoc/test",
           "--out", "outputs/plantdoc_test.json"]),
+        ("severity_probe", "outputs/severity_probe.json", [],
+         ["severity_probe", "--n", "150"]),
+        ("gradcam", "outputs/gradcam_audit.json", ["outputs/resnet18_best.pth"],
+         ["gradcam", "--model", "resnet18", "--n", "60"]),
         ("robust_p0", "outputs/resnet18_color_p0_224_history.json", [],
          ["train_robust", "--model", "resnet18", "--image-size", "224",
           "--p-random", "0.0", "--epochs", str(epochs)]),
@@ -49,6 +53,9 @@ def stages(epochs, ft_epochs, full_ablation):
         ("robust_segmented", "outputs/resnet18_segmented_p0_224_history.json", [],
          ["train_robust", "--model", "resnet18", "--image-size", "224",
           "--variant", "segmented", "--epochs", str(epochs)]),
+        ("robust_grayscale", "outputs/resnet18_grayscale_p0_224_history.json", [],
+         ["train_robust", "--model", "resnet18", "--image-size", "224",
+          "--variant", "grayscale", "--epochs", str(epochs)]),
     ]
     if full_ablation:
         plan += [
@@ -117,6 +124,7 @@ def summarise(out_dir):
     for tag, label in [("resnet18_color_p0_224", "Strong aug only (p=0.0)"),
                        ("resnet18_color_p70_224", "Background randomised (p=0.7)"),
                        ("resnet18_segmented_p0_224", "Trained on segmented"),
+                       ("resnet18_grayscale_p0_224", "Trained on grayscale"),
                        ("resnet18_color_p100_224", "Background randomised (p=1.0)"),
                        ("resnet50_color_p70_224", "ResNet-50, p=0.7")]:
         d = load(out_dir / f"{tag}_history.json")
@@ -148,6 +156,16 @@ def summarise(out_dir):
     if pdf:
         extra.append(f"Zero-shot on all PlantDoc (n={pdf.get('n_images', '?')}): "
                      f"ensemble {pdf['ensemble']:.2f}%")
+    probe_sev = load(out_dir / "severity_probe.json")
+    if probe_sev:
+        extra.append(f"Severity ratio separates healthy/diseased: AUC "
+                     f"{probe_sev['auc_official_mask']:.3f} (official mask), "
+                     f"{probe_sev['auc_otsu_mask']:.3f} (Otsu)")
+    cam = load(out_dir / "gradcam_audit.json")
+    if cam:
+        extra.append(f"Grad-CAM mass inside leaf: {cam['mean_attention_in_leaf'] * 100:.1f}% "
+                     f"vs {cam['mean_leaf_area_fraction'] * 100:.1f}% leaf area "
+                     f"({cam['attention_lift_over_area'] * 100:+.1f} pts)")
     sev = load(out_dir / "severity_validation.json")
     if sev:
         extra.append(f"Severity vs manual grades: rho={sev['spearman_rho']:.3f}, "
