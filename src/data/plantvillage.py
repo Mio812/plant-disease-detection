@@ -62,7 +62,7 @@ def parse_class_name(name):
 
 def get_dataloaders(cfg):
     base = ImageFolder(cfg.data.root)
-    train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))
+    train_idx, val_idx, test_idx = splits_from_config(cfg, base)
 
     train_tf = build_transforms(cfg.data.image_size, train=True)
     eval_tf = build_transforms(cfg.data.image_size, train=False)
