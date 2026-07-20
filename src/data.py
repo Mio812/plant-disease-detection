@@ -94,3 +94,44 @@ def class_distribution(root):
     for class_dir in sorted(p for p in root.iterdir() if p.is_dir()):
         counts[class_dir.name] = sum(1 for _ in class_dir.glob("*.*"))
     return counts
+
+
+class ItemDataset(Dataset):
+    """Dataset over an explicit ``(path, label)`` list."""
+
+    def __init__(self, items, transform):
+        self.items = items
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, i):
+        from PIL import Image
+
+        path, label = self.items[i]
+        return self.transform(Image.open(path).convert("RGB")), label
+
+
+def variant_samples(base, indices, variant, segmented_root):
+    """Map dataset indices onto another PlantVillage variant.
+
+    The split is always derived from the colour ImageFolder so that every
+    variant sees exactly the same physical leaves; segmented filenames differ,
+    so they are matched on the original-name key.
+    """
+    from .bias import name_key, segmented_index
+
+    if variant == "color":
+        return [base.samples[i] for i in indices]
+    index = {}
+    items = []
+    for i in indices:
+        path, label = base.samples[i]
+        class_name = base.classes[label]
+        if class_name not in index:
+            index[class_name] = segmented_index(segmented_root, class_name)
+        twin = index[class_name].get(name_key(Path(path).name))
+        if twin is not None:
+            items.append((twin, label))
+    return items
