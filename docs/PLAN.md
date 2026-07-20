@@ -30,18 +30,58 @@ conclusion.
 
 Nothing else may touch `src/` or `scripts/` until these finish.
 
-## Queue, in order
+## What the project is graded against
 
-1. **073 labels** in `configs/experiments.yaml` so the numbering is continuous
-   (docs side already done: `EXPERIMENTS.md` §5, `CLAUDE.md`)
-2. **Deferred patches** — float32 in `random_background`, `--num-workers` for
-   `scripts/finetune.py`. After *all* training, not merely an idle GPU
-3. **Per-image predictions** in `evaluate.py`, then McNemar on the paired arms
-4. **E22** — direct binary head. Literal compliance with brief Task 1
-5. **Notebook** — extend `tools/build_notebook.py` to E15–E18, add cell ids
-6. **E23** — better leaf mask, closes the 0.767 → 0.868 severity gap
-7. **E19 / E21** — scale probe, robustness strata. If time permits
-8. **Report, slides, notebook execution** — once the above is closed
+090 is the core and everything is ordered by it. Its two tasks:
+
+1. a CNN that categorises leaves into **healthy and diseased** classes
+2. the model **expanded** to estimate **disease severity from image features**
+
+073 is an extension: it tests whether task 1 survives outside the lab. Useful,
+never co-equal.
+
+Weighting matters here. Task 2 is half the brief and currently carries three
+experiments (E12, E13, E14) against roughly twenty on classification, and E14 has
+no progress at all. Work is ordered to correct that, not to keep deepening the
+half that is already strong.
+
+## Order of execution
+
+Run strictly in sequence. Each phase gates the next.
+
+**Phase 0 — while the queue is live.** No edits to `src/` or `scripts/`.
+- [x] pre-register H15/E24 (c4371ce) and H16/E25
+- [x] fix the order in this file
+- [ ] draft the lesion-ratio caching pass in the scratchpad, ready to install
+
+**Phase 1 — the moment the queue drains. Decide from the data before building.**
+- [ ] read the five `eval_arm_*` artefacts; settle **H9** (`eval_arm_hier` against
+      `eval_arm_bg_random`, crop accuracy, 2,525 basis only) and whether **E8's
+      +0.42 survives** at ±1.7pp
+- [ ] record both outcomes in `EXPERIMENTS.md` and here, whichever way they fall
+- [ ] install the deferred patches, and per-image predictions in `evaluate.py`
+- [ ] McNemar on the paired arms, as pre-registered in a023841
+
+**Phase 2 — core task 2, the weakest half.**
+- [ ] cache lesion ratios for all 54,305 images from the official masks
+- [ ] **E25** multi-task backbone: classification head + severity head
+- [ ] score the severity head against its floor (0.767 Otsu) and ceiling (0.868)
+- [ ] **E14** the moment gradings return: `annotate --action merge`, then
+      `audit --probe severity-validate`
+
+**Phase 3 — core task 1.**
+- [ ] **E22** direct binary head, against binary collapsed from the 38-way arm
+- [ ] **E24** frozen-backbone ladder (script already drafted and CPU-verified)
+
+**Phase 4 — refinement, only if phases 1–3 are closed.**
+- [ ] E23 leaf mask — likely redundant once E25 lands
+- [ ] E19 scale probe, E21 capture-condition strata
+
+**Phase 5 — deliverables, once the matrix is closed.**
+- [ ] 073 stage labels in `configs/experiments.yaml`
+- [ ] notebook extended to E15–E18 and E24/E25, cell ids added
+- [ ] report `.docx`, then the UNSW PPT template filled as-is
+- [ ] `nbconvert --execute --inplace` last, so outputs are visible
 
 ## Blocked on people
 

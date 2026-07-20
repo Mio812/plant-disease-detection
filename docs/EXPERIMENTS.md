@@ -42,6 +42,7 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H13 | The Otsu-versus-official-mask AUC gap is segmentation error, not a ceiling on the lesion-ratio feature, so a better unsupervised mask recovers part of it. | open |
 | H14 | Background randomisation buys little zero-shot, but leaves features that *adapt* better, so its advantage grows under supervised adaptation rather than disappearing. | open |
 | H15 | E15 shows the frozen ImageNet backbone already does all the field-transferable work, so field accuracy should track **backbone quality and pretraining diversity** rather than anything done on PlantVillage. A stronger frozen CNN should therefore move the field number where six PlantVillage-side interventions could not. | open |
+| H16 | A severity head trained to regress the official-mask lesion ratio beats re-deriving that mask with Otsu at inference, because it learns the mask from image features instead of approximating it with a colour heuristic. | open |
 
 ### The clearest single result: 574x the parameters, no field gain
 
@@ -146,6 +147,7 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E22 | Two-way healthy/diseased head, trained directly | H12 | matched to E8 `p = 0.7` in every respect but the output space; control is binary collapsed from the same arm's 38-way predictions | open |
 | E23 | Alternative unsupervised leaf mask | H13 | current `_leaf_mask` heuristic is the control, scored by Dice *and* by the severity AUC it produces | open |
 | E24 | Frozen-backbone ladder: ResNet-18 → ResNet-50 (V1) → ResNet-50 (V2) → ConvNeXt-T → RegNet-Y-16GF (SWAG) | H15 | each rung moves **one** factor — capacity, then training recipe, then architecture generation, then pretraining data. ResNet-18 under the same cached-feature protocol is the control | open |
+| E25 | Multi-task head: classification **and** severity regression on one backbone | H16 | Otsu ratio (AUC 0.767) is the floor it must beat; official-mask ratio (0.868) is the ceiling, since that one reads ground-truth masks | open |
 
 ## 4. What would falsify the conclusions
 
@@ -168,6 +170,11 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If every arm degrades at the same rate across the capture-quality bins (E21),
   H11 is rejected. 073-2 is then reported as *evaluated under* natural variation
   rather than *robust to* it, in the same way E7 and E8 are reported.
+- If E25's severity head does not clear an AUC of 0.767, learned image features
+  are worth no more than the colour heuristic they replace, H16 is rejected, and
+  severity is reported as a classical estimator rather than a model output. Note
+  the brief asks to *expand the model* to estimate severity, so this arm is what
+  makes the second task a property of the network rather than a pipeline beside it.
 - If field accuracy is flat along the whole E24 ladder — including the jump from
   ImageNet to SWAG's 3.6B web images — H15 is rejected, and the ceiling is the
   domain gap itself rather than feature quality. That would be the seventh
