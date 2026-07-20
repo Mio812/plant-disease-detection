@@ -168,6 +168,8 @@ def main():
     results, started = [], time.time()
     for name, produces, requires, argv in plan:
         produced_earlier.add(produces)
+        if produces.endswith("_history.json"):
+            produced_earlier.add(produces.replace("_history.json", "_best.pth"))
         if args.only and name not in args.only:
             continue
         if name in args.skip:
