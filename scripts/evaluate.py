@@ -60,6 +60,9 @@ def parse_args():
     parser.add_argument("--out", default=None)
     parser.add_argument("--save-reports", action="store_true",
                         help="also write the classification report and confusion matrix")
+    parser.add_argument("--save-predictions", action="store_true",
+                        help="also write per-image predictions, so arms scored on the "
+                             "same images can be compared with a paired test")
     return parser.parse_args()
 
 
@@ -180,6 +183,12 @@ def main():
     out = Path(args.out) if args.out else out_dir / f"eval_{args.dataset}.json"
     out.write_text(json.dumps(results, indent=2), encoding="utf-8")
     print(f"\nsaved {out.as_posix()}")
+
+    if args.save_predictions:
+        preds = out.with_name(f"{out.stem}_predictions.json")
+        preds.write_text(json.dumps({"pred": y_pred.tolist(), "true": y.tolist(),
+                                     "classes": classes}), encoding="utf-8")
+        print(f"saved {preds.as_posix()}")
 
 
 if __name__ == "__main__":

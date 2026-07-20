@@ -31,11 +31,11 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H2 | Much of that accuracy comes from capture bias in the background, not from leaf pathology. | confirmed |
 | H3 | Accuracy therefore collapses on real field photographs. | confirmed |
 | H4 | The collapse is a *learned shortcut*, not a test-time statistics shift, so test-time fixes will not repair it. | confirmed |
-| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | supported on the 2,525 basis (+1.63 pp, +2.89 on crop); significance awaits the pre-registered McNemar |
+| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **confirmed** — McNemar on 2,525: +41 of 179 discordant, p = 0.0027; crop +73 of 319, p = 5.2e-05. Earlier recorded as null on an underpowered n = 236 reading |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
-| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **supported** — the earlier "tie" was an underpowered n=236 reading; on 2,525 the frozen backbone wins by +1.67 (38-way), +4.13 (binary), +5.25 (crop) |
-| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **direction supported, magnitude rejected** — crop rose 36.99 → 38.73 (+1.74), nowhere near the ~60% that would have made it matter, and still below simply freezing the backbone (40.12) |
+| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **confirmed** — McNemar at `p = 0.0`: 38-way p = 0.0012, crop p = 2.1e-08, binary p = 1.6e-04; the crop and binary effects hold at `p = 0.7` too. The earlier "tie" was an underpowered n = 236 reading |
+| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **magnitude rejected, mechanism unproven** — crop rose 36.99 → 38.73, p = 0.014 raw, which does **not** survive correction for the 12 paired tests run; 38-way p = 0.10. Nowhere near the ~60% predicted, and below simply freezing the backbone (40.12) |
 | H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
 | H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | open |
 | H12 | Task 1 is healthy-vs-diseased, which does not require species identification — the very thing H7 shows is the field bottleneck. Training the binary objective directly should therefore transfer better than collapsing a 38-way model's predictions. | open |
@@ -264,11 +264,17 @@ something invented.
    the intervals did. Wilson intervals stay for single-arm accuracies, where they
    are the right tool. Requires per-image predictions, which `evaluate.py` does
    not yet persist.
-9. The adapted arms consumed PlantDoc train, so **236 images is the only legal
+9. Twelve paired tests were run (four arm pairs x three label granularities). No
+   correction was pre-specified, so raw p-values are reported with the
+   multiplicity stated rather than a correction chosen after seeing them. Under
+   Bonferroni (0.05/12 = 0.0042) the E8 and E15 results survive and **H9's crop
+   effect does not**. Any claim resting on p between 0.004 and 0.05 is described
+   as suggestive, not established.
+10. The adapted arms consumed PlantDoc train, so **236 images is the only legal
    test set they have**. Their comparisons can never be tightened the way
    `eval_arm_*` tightens the zero-shot ones by scoring all 2,525. Every adapted
    comparison is reported with that ceiling stated.
-10. E14's severity bands were realigned to the annotation rubric before any leaf
+11. E14's severity bands were realigned to the annotation rubric before any leaf
    was graded. The two had disagreed by one level — the estimator called anything
    under 5% lesion area `healthy`, while annotators were told under 5% was `mild`
    — which put 85% of the sample in a different bin. Left alone, a flawless

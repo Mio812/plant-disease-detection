@@ -310,8 +310,47 @@ def probe_severity_validate(cfg, args):
     return "severity_validation.json", summary
 
 
+def probe_paired(cfg, args):
+    """McNemar between two arms scored on the same images.
+
+    E8 and E15 each compare arms over one PlantDoc pass. Wilson intervals describe
+    a single accuracy and know nothing about the pairing, so they answer a weaker
+    question than the design supports.
+    """
+    from src.evaluation import mcnemar
+    from src.models.hierarchical import crop_of
+
+    if not args.arms or len(args.arms) != 2:
+        raise SystemExit("--arms takes exactly two *_predictions.json files")
+    a, b = [json.loads(Path(p).read_text(encoding="utf-8")) for p in args.arms]
+    if a["true"] != b["true"]:
+        raise SystemExit("the two arms were not scored on the same images in the same order")
+
+    classes, truth = a["classes"], a["true"]
+    crop = crop_of(classes)[0].tolist()
+    healthy = [1 if "healthy" in c.lower() else 0 for c in classes]
+    views = {"all_38": lambda p, t: p == t,
+             "crop": lambda p, t: crop[p] == crop[t],
+             "binary": lambda p, t: healthy[p] == healthy[t]}
+
+    def short(path):
+        return Path(path).stem.replace("eval_arm_", "").replace("_predictions", "")
+
+    names = [short(p) for p in args.arms]
+    summary = {"arm_a": names[0], "arm_b": names[1], "n": len(truth)}
+    print(f"  {names[0]} (a)  vs  {names[1]} (b)")
+    for level, hit in views.items():
+        result = mcnemar([hit(p, t) for p, t in zip(a["pred"], truth)],
+                         [hit(p, t) for p, t in zip(b["pred"], truth)])
+        summary[level] = result
+        print(f"  {level:8s} {result['accuracy_a']:6.2f} vs {result['accuracy_b']:6.2f}   "
+              f"net {result['net_gain_b']:+5d} of {result['discordant']:5d} discordant   "
+              f"p = {result['p_value']:.4g}")
+    return f"paired_{names[0]}_vs_{names[1]}.json", summary
+
+
 PROBES = {"background": probe_background, "gradcam": probe_gradcam, "severity": probe_severity,
-          "adaptation": probe_adaptation, "efficiency": probe_efficiency,
+          "adaptation": probe_adaptation, "efficiency": probe_efficiency, "paired": probe_paired,
           "severity-sample": probe_severity_sample, "severity-validate": probe_severity_validate}
 
 
@@ -325,6 +364,8 @@ def main():
     parser.add_argument("--per-class-train", type=int, default=100)
     parser.add_argument("--per-class-test", type=int, default=50)
     parser.add_argument("--csv", default="outputs/severity_annotations.csv")
+    parser.add_argument("--arms", nargs="+", default=None,
+                        help="two *_predictions.json files, for --probe paired")
     parser.add_argument("--plantdoc", default="data/PlantDoc/test")
     parser.add_argument("--weights", type=float, nargs="+", default=[0.2, 0.5, 0.3])
     parser.add_argument("--image-size", type=int, default=None)
