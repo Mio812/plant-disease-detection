@@ -6,6 +6,31 @@ Update it as stages land, so nothing has to be reconstructed from memory later.
 
 Last updated: 2026-07-20, during the `push.ps1` queue.
 
+## Leaf-leakage rebuild (in progress)
+
+`leaf-map.json` revealed that the random split leaked same-leaf duplicates: 74.7%
+of the test set (among images with a known leaf) had a same-leaf twin in training,
+so the 99.84% was partly reading back leaves already seen. `splits.py` now
+partitions leaves within each class (0% leakage, verified). The whole matrix is
+retraining under it via `rebuild.ps1`; leaky results are preserved in
+`outputs_leaky/` for the inflation comparison.
+
+Three defects found and fixed along the way:
+- the split was leaking (74.7%) — the headline finding
+- `.gitignore`'s unanchored `data/` had kept `src/data/` — including `splits.py`,
+  the single source of truth — out of git since the project began
+- `get_dataloaders` passed `len(base)`, so `ensemble.py` would have scored Task 1
+  on the leaky split even after the fix; the int-fallback exists to make that kind
+  of miss loud, and it was the seventh and last caller
+
+Expectation, to be checked against results: the leak was constant across arms, so
+every A-vs-B conclusion (H5, H8, McNemar) should survive; only the absolute
+PlantVillage accuracies should fall. If a comparative conclusion flips, that is
+itself a finding and gets recorded.
+
+Leaky reference (to be replaced by honest numbers): ensemble 99.84 / binary 100.00;
+resnet18 arms 99.52 / 99.26 / 91.70 (frozen) / 99.24 (seg) / 98.48 (gray).
+
 ## Rule for this phase
 
 **Finish the experiments before writing the report.** Every number that can still
