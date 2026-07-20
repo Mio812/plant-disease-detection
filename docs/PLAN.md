@@ -47,7 +47,26 @@ half that is already strong.
 
 ## Order of execution
 
-Run strictly in sequence. Each phase gates the next.
+**Close both core tasks on PlantVillage before touching PlantDoc again.** 090 is
+the brief; its dataset is the three raw variants. Field work is an extension and
+waits. Run strictly in sequence; each phase gates the next.
+
+### Task 1 — closed
+
+| variant | 38-way | binary |
+|---|---|---|
+| color, ensemble | **99.84** | **100.00** |
+| segmented, trained on it | 99.24 | — |
+| grayscale, trained on it | 98.48 | — |
+
+All three raw parts used. 13 errors remain out of 8,145 (0.160%): eleven are
+within-crop disease confusions that are genuinely ambiguous — Corn Cercospora
+against Northern Leaf Blight, Tomato early against late blight — and two are
+healthy-to-healthy across crops. **No healthy image is ever called diseased or the
+reverse**, which is why the binary number is exactly 100.00. There is no headroom
+here worth spending time on; the residue is dataset noise.
+
+### Task 2 — the open half
 
 **Phase 0 — while the queue is live.** No edits to `src/` or `scripts/`.
 - [x] pre-register H15/E24 (c4371ce) and H16/E25
@@ -66,19 +85,23 @@ Run strictly in sequence. Each phase gates the next.
       and the generator switch buys nothing over the stream-preserving cast
 - [x] `--save-predictions`, `mcnemar()`, and the `paired` probe (b5af615)
 
-**Phase 2 — core task 2, the weakest half.**
-- [ ] cache lesion ratios for all 54,305 images from the official masks
-- [ ] **E25** multi-task backbone: classification head + severity head
-- [ ] score the severity head against its floor (0.767 Otsu) and ceiling (0.868)
+**Phase 2 — finish task 2 on PlantVillage. Everything else waits.**
+- [x] cache lesion ratios for all 54,305 images from the official masks (54,304 cached)
+- [x] verify the target is severity and not an artefact: healthy median 0.0216 vs
+      diseased 0.1006, corpus AUC 0.8324, lowest-median classes all healthy
+- [ ] **E25** severity head on the trained backbone, scored against its floor
+      (Otsu) and ceiling (official mask) on the same test split
+- [ ] if a linear head on frozen features cannot recover severity, try an MLP head
+      and joint fine-tuning **before** concluding the features lack it
+- [ ] **E23** better unsupervised mask — raises the deployable floor, PlantVillage-only
 - [ ] **E14** the moment gradings return: `annotate --action merge`, then
-      `audit --probe severity-validate`
+      `audit --probe severity-validate`. This is the only evidence severity is
+      *trustworthy* rather than merely correlated
 
-**Phase 3 — core task 1.**
-- [ ] **E22** direct binary head, against binary collapsed from the 38-way arm
-- [ ] **E24** frozen-backbone ladder (script already drafted and CPU-verified)
-
-**Phase 4 — refinement, only if phases 1–3 are closed.**
-- [ ] E23 leaf mask — likely redundant once E25 lands
+**Phase 3 — the 073 extension, once both core tasks are closed.**
+- [ ] **E24** frozen-backbone ladder (drafted, CPU-verified, waiting)
+- [ ] **E22** direct binary head — no headroom on PlantVillage, where binary is
+      already 100.00; it is a field-accuracy arm and belongs here
 - [ ] E19 scale probe, E21 capture-condition strata
 
 **Phase 5 — deliverables, once the matrix is closed.**
