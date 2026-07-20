@@ -51,7 +51,7 @@ def probe_background(cfg, args):
     from sklearn.preprocessing import StandardScaler
 
     base = ImageFolder(cfg.data.root)
-    train_idx, _, test_idx = splits_from_config(cfg, len(base))
+    train_idx, _, test_idx = splits_from_config(cfg, base)
     rows, seen = [], {}
     for split, indices, cap in (("train", train_idx, args.per_class_train),
                                 ("test", test_idx, args.per_class_test)):

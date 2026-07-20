@@ -151,7 +151,7 @@ def main():
     base = ImageFolder(cfg.data.root)
     classes = base.classes
     crop_index, crops = crop_of(classes)
-    train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))
+    train_idx, val_idx, test_idx = splits_from_config(cfg, base)
     transform = build_transforms(cfg.data.image_size, train=False)
 
     field_items = []

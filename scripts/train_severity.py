@@ -102,7 +102,7 @@ def main():
     base = ImageFolder(cfg.data.root)
     classes = base.classes
     ratios = json.loads(Path(args.ratios).read_text(encoding="utf-8"))["ratios"]
-    train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))
+    train_idx, val_idx, test_idx = splits_from_config(cfg, base)
 
     def gather(indices):
         """Keep only images with a cached official-mask ratio."""
@@ -148,11 +148,35 @@ def main():
     print("computing the Otsu baseline on the same images...")
     otsu = np.array([lesion_ratio(cv2.imread(p)) for p, _ in items], dtype=np.float32)
 
+    # Healthy-vs-diseased AUC is largely answerable from class identity alone, and a
+    # head reading classifier features can do that without measuring the leaf in
+    # front of it. Correlating inside each class removes that route, so this is the
+    # number that says whether severity is being estimated at all.
+    labels = np.array([l for _, l in items])
+
+    def within_class(pred):
+        rhos, sizes = [], []
+        for label in np.unique(labels):
+            idx = np.flatnonzero(labels == label)
+            if len(idx) < 30:
+                continue
+            rho = spearmanr(pred[idx], official[idx]).statistic
+            if np.isfinite(rho):
+                rhos.append(rho)
+                sizes.append(len(idx))
+        return round(float(np.average(rhos, weights=sizes)), 4), len(rhos)
+
+    rho_head, n_scored = within_class(predicted)
+    rho_otsu, _ = within_class(otsu)
+
     summary = {
         "checkpoint": args.checkpoint,
         "feature_dim": width,
         "head_parameters": head_params,
         "n_test": len(items),
+        "within_class_rho_head": rho_head,
+        "within_class_rho_otsu": rho_otsu,
+        "within_class_n_classes": n_scored,
         "val_mse_sqrt_ratio": round(val_mse, 6),
         "auc_predicted": round(float(roc_auc_score(diseased, predicted)), 4),
         "auc_official_mask": round(float(roc_auc_score(diseased, official)), 4),
@@ -162,8 +186,10 @@ def main():
         "mae_vs_official": round(float(np.abs(predicted - official).mean()), 4),
         "mae_otsu_vs_official": round(float(np.abs(otsu - official).mean()), 4),
     }
+    print(f"\n  within-class rho: head {rho_head:.4f}   Otsu {rho_otsu:.4f}   "
+          f"({n_scored} classes)   <- does it measure THIS leaf?")
     print(f"\n  AUC  predicted head {summary['auc_predicted']:.4f}"
-          f"   <- must beat Otsu to be worth having")
+          f"   <- confounded: class identity alone answers most of this")
     print(f"  AUC  Otsu (floor)   {summary['auc_otsu_mask']:.4f}")
     print(f"  AUC  official mask  {summary['auc_official_mask']:.4f}   "
           f"<- ceiling, reads masks the deployed system will not have")

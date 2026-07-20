@@ -12,6 +12,8 @@ env/
 data/
 outputs/*
 !outputs/.gitkeep
+outputs_leaky/
+outputs_quick/
 *.pth
 *.pt
 *.ckpt

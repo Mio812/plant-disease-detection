@@ -95,7 +95,7 @@ def main():
     device = get_device()
 
     base = ImageFolder(cfg.data.root)
-    train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))
+    train_idx, val_idx, test_idx = splits_from_config(cfg, base)
     active_root = variant_root(cfg.data.root, args.variant)
     eval_tf = build_transforms(cfg.data.image_size, train=False)
     train_tf = (build_strong_transforms(cfg.data.image_size) if args.augment == "strong"

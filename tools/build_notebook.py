@@ -101,7 +101,7 @@ md("## 3. Data sources",
 
 code("base = ImageFolder(cfg.data.root)",
     "counts = class_distribution(cfg.data.root)",
-    "train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))",
+    "train_idx, val_idx, test_idx = splits_from_config(cfg, base)",
     "",
     "print(f'PlantVillage: {len(base):,} images, {len(base.classes)} classes, "
     "{len({c.split(\"___\")[0] for c in base.classes})} crops')",

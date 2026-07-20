@@ -94,7 +94,7 @@ def build_eval_loader(cfg, dataset, plantdoc_dirs, classes):
             items.extend(found)
     else:
         variant = "color" if dataset == "plantvillage" else dataset
-        _, _, test_idx = splits_from_config(cfg, len(base))
+        _, _, test_idx = splits_from_config(cfg, base)
         items = variant_samples(base, test_idx, variant, variant_root(cfg.data.root, variant))
     loader = DataLoader(ItemDataset(items, transform), batch_size=cfg.data.batch_size,
                         num_workers=cfg.data.num_workers)
