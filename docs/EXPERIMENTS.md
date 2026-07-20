@@ -38,6 +38,9 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | open |
 | H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
 | H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | open |
+| H12 | Task 1 is healthy-vs-diseased, which does not require species identification — the very thing H7 shows is the field bottleneck. Training the binary objective directly should therefore transfer better than collapsing a 38-way model's predictions. | open |
+| H13 | The Otsu-versus-official-mask AUC gap is segmentation error, not a ceiling on the lesion-ratio feature, so a better unsupervised mask recovers part of it. | open |
+| H14 | Background randomisation buys little zero-shot, but leaves features that *adapt* better, so its advantage grows under supervised adaptation rather than disappearing. | open |
 
 ### The clearest single result: 574x the parameters, no field gain
 
@@ -139,6 +142,8 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E19 | Score PlantDoc at several test-time zoom factors | H10 | the current single 1.0x resize is the control; E7 varied flips and BatchNorm but never scale | open |
 | E20 | Train with the leaf composited at 20-60% of the frame | H10 | matched to E8 `p = 0.7` in every respect but leaf scale | open |
 | E21 | Field accuracy stratified by luminance, contrast and sharpness | H11 | standard-augmentation baseline is the control; Wilson interval per bin | open |
+| E22 | Two-way healthy/diseased head, trained directly | H12 | matched to E8 `p = 0.7` in every respect but the output space; control is binary collapsed from the same arm's 38-way predictions | open |
+| E23 | Alternative unsupervised leaf mask | H13 | current `_leaf_mask` heuristic is the control, scored by Dice *and* by the severity AUC it produces | open |
 
 ## 4. What would falsify the conclusions
 
@@ -174,6 +179,26 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | Rubric — Results (3) | E1–E11, comparison with Mohanty/Ferentinos/Singh |
 | Rubric — Discussion (2) | E4–E7 limitations, E14 calibration |
 
+### Coverage of the added field-data requirements
+
+PlantDoc is not a second project. It enters because RQ2 needs an instrument, and
+it is the only ready-made one. It does, however, originate in its own brief, so
+the field work is held to that brief's requirements as well. The mapping is
+recorded here so coverage is traceable rather than incidental.
+
+| Requirement | Met by | Evidence |
+|---|---|---|
+| Accuracy improvement over baseline methods (>31%) | E11 / E18, full-data adaptation | 17.37 → 55.93 = **+38.56 pp** over the baseline ensemble; **+31.78 pp** against the adapted arm's own zero-shot. Both n = 236 |
+| Robustness to lighting, growth stage and symptom variation | E21, with E8 supplying the mechanism and E10 bounding the colour dependence | open — E21 |
+| Lightweight enough for mobile or edge deployment | E15 with the efficiency probe | a frozen backbone plus a 19,494-parameter head is **78 KB per crop** against a 44.9 MB model, at no measured field cost (24.15% either way) |
+
+Two qualifications. The source paper's own wording is an *increase in classification
+accuracy*, and its baseline is a model trained on PlantVillage and tested on
+PlantDoc, so both readings above are reported rather than whichever is larger.
+And PlantDoc carries no growth-stage labels: E21 stratifies capture conditions
+only, and growth stage is recorded as a limitation instead of being proxied by
+something invented.
+
 ## 6. Reporting protocol
 
 1. Lab and field accuracy are always reported **together**; a lab number alone
@@ -195,7 +220,20 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 7. Known threats to validity: PlantDoc carries label noise;
    its train/test splits are known to differ in content; our field evaluation is
    236 images (±5 points), so the full-dataset variant is also reported.
-8. E14's severity bands were realigned to the annotation rubric before any leaf
+8. Two arms scored on the *same* images are compared with **McNemar's test on the
+   discordant pairs**, not by asking whether two independent Wilson intervals
+   overlap. The design is paired and always was, so independent intervals were
+   the wrong instrument from the start and threw away most of the power. This is
+   declared here *before* any paired statistic is computed, and the outcome is
+   reported whichever way it falls — including if it leaves E8 exactly as null as
+   the intervals did. Wilson intervals stay for single-arm accuracies, where they
+   are the right tool. Requires per-image predictions, which `evaluate.py` does
+   not yet persist.
+9. The adapted arms consumed PlantDoc train, so **236 images is the only legal
+   test set they have**. Their comparisons can never be tightened the way
+   `eval_arm_*` tightens the zero-shot ones by scoring all 2,525. Every adapted
+   comparison is reported with that ceiling stated.
+10. E14's severity bands were realigned to the annotation rubric before any leaf
    was graded. The two had disagreed by one level — the estimator called anything
    under 5% lesion area `healthy`, while annotators were told under 5% was `mild`
    — which put 85% of the sample in a different bin. Left alone, a flawless
