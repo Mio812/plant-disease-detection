@@ -26,6 +26,8 @@ from torchvision.datasets import ImageFolder
 
 from src.audit import border_features, grad_cam, leaf_attention, target_layer
 from src.audit.severity import (
+    _leaf_mask,
+    dice,
     estimate_severity,
     leaf_mask_from_segmented,
     lesion_ratio,
@@ -130,7 +132,7 @@ def probe_severity(cfg, args):
     chosen = ([(i, 0) for i in rng.sample(healthy_idx, min(args.n, len(healthy_idx)))] +
               [(i, 1) for i in rng.sample(diseased_idx, min(args.n, len(diseased_idx)))])
 
-    index, rows = {}, []
+    index, rows, dices = {}, [], []
     for i, is_diseased in chosen:
         path, label = base.samples[i]
         image = cv2.imread(path)
@@ -146,6 +148,7 @@ def probe_severity(cfg, args):
             if seg is not None:
                 mask = leaf_mask_from_segmented(cv2.resize(seg, image.shape[1::-1]))
                 official = lesion_ratio(image, mask)
+                dices.append(dice(_leaf_mask(cv2.cvtColor(image, cv2.COLOR_BGR2HSV)), mask))
         rows.append((is_diseased, lesion_ratio(image), official))
 
     y = np.array([r[0] for r in rows])
@@ -160,13 +163,68 @@ def probe_severity(cfg, args):
                "auc_official_mask": float(roc_auc_score(y[have], official[have])),
                "mean_ratio_healthy_official": float(official[have & (y == 0)].mean()),
                "mean_ratio_diseased_official": float(official[have & (y == 1)].mean()),
-               "diseased_grade_distribution": {lv: grades.count(lv) for lv in levels}}
+               "diseased_grade_distribution": {lv: grades.count(lv) for lv in levels},
+               "leaf_segmentation_dice_mean": float(np.mean(dices)) if dices else None,
+               "leaf_segmentation_dice_median": float(np.median(dices)) if dices else None,
+               "leaf_segmentation_dice_below_0.5": float(np.mean(np.array(dices) < 0.5)) if dices else None}
     print(f"  ROC-AUC healthy vs diseased, Otsu mask     : {summary['auc_otsu_mask']:.3f}")
     print(f"  ROC-AUC healthy vs diseased, official mask : {summary['auc_official_mask']:.3f}")
     print(f"  mean lesion ratio  healthy {summary['mean_ratio_healthy_official']:.3f} "
           f"| diseased {summary['mean_ratio_diseased_official']:.3f}")
     print(f"  diseased grades: {summary['diseased_grade_distribution']}")
+    if dices:
+        print(f"  leaf-segmentation Dice vs official masks: mean "
+              f"{summary['leaf_segmentation_dice_mean']:.3f} / median "
+              f"{summary['leaf_segmentation_dice_median']:.3f}")
     return "severity_probe.json", summary
+
+
+def probe_adaptation(cfg, args):
+    """E7 - can inference-time fixes repair the field gap? (Expected: no.)"""
+    from torch.utils.data import DataLoader
+
+    from src.data import ItemDataset, plantdoc_items
+    from src.evaluation import enable_batchnorm_adaptation, load_model, predict_loader
+    from src.models import combine
+
+    base = ImageFolder(cfg.data.root)
+    classes = base.classes
+    items = plantdoc_items(args.plantdoc, {c: i for i, c in enumerate(classes)})
+    loader = DataLoader(ItemDataset(items, build_transforms(cfg.data.image_size, train=False)),
+                        batch_size=cfg.data.batch_size, num_workers=0)
+    device = get_device()
+    weights = args.weights
+    members = ["custom_cnn", "resnet18", "mobilenet_v2"]
+
+    y = np.array([lab for _, lab in items])
+    present = np.zeros(len(classes), bool)
+    present[sorted(set(y.tolist()))] = True
+
+    # load each member once; AdaBN only flips BatchNorm mode, so no reloading
+    loaded = [load_model(n, len(classes), f"{cfg.output_dir}/{n}_best.pth", device)
+              for n in members]
+
+    def score(adabn, tta):
+        probs = []
+        for model in loaded:
+            model.eval()
+            if adabn:
+                enable_batchnorm_adaptation(model)
+            member, _ = predict_loader(model, loader, device, tta=tta)
+            probs.append(member)
+        ens = combine(probs, weights).numpy()
+        closed = ens.copy()
+        closed[:, ~present] = 0.0
+        return (float((ens.argmax(1) == y).mean() * 100),
+                float((closed.argmax(1) == y).mean() * 100))
+
+    summary = {}
+    for label, adabn, tta in [("baseline", False, False), ("+TTA", False, True),
+                              ("+AdaBN", True, False), ("+AdaBN +TTA", True, True)]:
+        open_acc, closed_acc = score(adabn, tta)
+        summary[label] = {"open_38way": round(open_acc, 2), "closed_27way": round(closed_acc, 2)}
+        print(f"  {label:14s} 38-way {open_acc:5.2f}%   closed-set {closed_acc:5.2f}%")
+    return "adaptation_probe.json", summary
 
 
 def probe_severity_sample(cfg, args):
@@ -215,6 +273,7 @@ def probe_severity_validate(cfg, args):
 
 
 PROBES = {"background": probe_background, "gradcam": probe_gradcam, "severity": probe_severity,
+          "adaptation": probe_adaptation,
           "severity-sample": probe_severity_sample, "severity-validate": probe_severity_validate}
 
 
@@ -228,6 +287,8 @@ def main():
     parser.add_argument("--per-class-train", type=int, default=100)
     parser.add_argument("--per-class-test", type=int, default=50)
     parser.add_argument("--csv", default="outputs/severity_annotations.csv")
+    parser.add_argument("--plantdoc", default="data/PlantDoc/test")
+    parser.add_argument("--weights", type=float, nargs="+", default=[0.2, 0.5, 0.3])
     parser.add_argument("--out", default=None,
                         help="override the output filename (use for smoke tests)")
     args = parser.parse_args()

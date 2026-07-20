@@ -46,6 +46,12 @@ stages:
     requires: [data/PlantDoc/test]
     run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, --weights, "${weights}"]
 
+  - id: adaptation
+    experiment: E7
+    produces: outputs/adaptation_probe.json
+    requires: [outputs/resnet18_best.pth, data/PlantDoc/test]
+    run: [audit, --probe, adaptation, --weights, "${weights}"]
+
   - id: eval_field_full
     experiment: E6
     produces: outputs/eval_plantdoc_full.json
