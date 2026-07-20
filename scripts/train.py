@@ -32,7 +32,7 @@ from src.data import (
     variant_samples,
 )
 from src.evaluation import full_report
-from src.models import build_model
+from src.models import build_model, freeze_backbone, trainable_parameters
 from src.training import BackgroundRandomised, build_strong_transforms, evaluate, fit
 from src.utils import get_device, set_seed
 
@@ -47,6 +47,9 @@ def parse_args():
                         help="probability of replacing the background (colour variant only)")
     parser.add_argument("--image-size", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--freeze-backbone", action="store_true",
+                        help="train only the classification head (linear probe)")
     parser.add_argument("--plantdoc", default="data/PlantDoc/test")
     parser.add_argument("--tag", default=None)
     return parser.parse_args()
@@ -55,9 +58,12 @@ def parse_args():
 def resolve_tag(args, cfg):
     if args.tag:
         return args.tag
-    if args.variant == "color" and args.augment == "standard" and args.p_random == 0.0:
+    if (args.variant == "color" and args.augment == "standard"
+            and args.p_random == 0.0 and not args.freeze_backbone):
         return cfg.model.name
-    return f"{cfg.model.name}_{args.variant}_{args.augment}_p{int(args.p_random * 100)}_{cfg.data.image_size}"
+    suffix = "_frozen" if args.freeze_backbone else ""
+    return (f"{cfg.model.name}_{args.variant}_{args.augment}"
+            f"_p{int(args.p_random * 100)}_{cfg.data.image_size}{suffix}")
 
 
 def main():
@@ -69,6 +75,8 @@ def main():
         cfg.data.image_size = args.image_size
     if args.epochs:
         cfg.train.epochs = args.epochs
+    if args.lr:
+        cfg.train.lr = args.lr
     if args.variant != "color":
         args.p_random = 0.0
     set_seed(cfg.seed)
@@ -103,9 +111,17 @@ def main():
           f"size={cfg.data.image_size} | train={len(train_ds)}")
 
     model = build_model(cfg.model.name, len(classes), cfg.model.pretrained).to(device)
+    if args.freeze_backbone:
+        if not cfg.model.pretrained:
+            raise SystemExit("--freeze-backbone needs pretrained weights to probe")
+        freeze_backbone(model, cfg.model.name)
+    trainable, total = trainable_parameters(model)
+    print(f"[{tag}] trainable {trainable:,} / {total:,} parameters "
+          f"({100.0 * trainable / total:.2f}%)")
+
     criterion = nn.CrossEntropyLoss(label_smoothing=cfg.train.label_smoothing)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.train.lr,
-                                  weight_decay=cfg.train.weight_decay)
+    optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
+                                  lr=cfg.train.lr, weight_decay=cfg.train.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cfg.train.epochs)
 
     out_dir = Path(cfg.output_dir)
@@ -133,6 +149,8 @@ def main():
         json.dump({"history": history, "test_metrics": test_metrics,
                    "plantdoc_accuracy": field_acc, "variant": args.variant,
                    "augment": args.augment, "p_random": args.p_random,
+                   "frozen_backbone": args.freeze_backbone, "lr": cfg.train.lr,
+                   "trainable_parameters": trainable, "total_parameters": total,
                    "image_size": cfg.data.image_size, "classes": classes}, f, indent=2)
 
 

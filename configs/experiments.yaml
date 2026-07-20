@@ -8,6 +8,7 @@
 defaults:
   epochs: 20
   ft_epochs: 15
+  probe_lr: 0.01
   image_size: 224
   weights: [0.2, 0.5, 0.3]
 
@@ -82,6 +83,24 @@ stages:
     run: [train, --model, resnet18, --augment, strong, --p-random, "0.7",
           --image-size, "${image_size}", --epochs, "${epochs}"]
 
+  # E15: does full fine-tuning on PlantVillage destroy transferable ImageNet features?
+  # Crossed with background randomisation, so the two factors and their interaction
+  # separate. Head-only training uses a larger learning rate, as is standard for probes.
+  - id: train_frozen_control
+    experiment: E15 control
+    produces: outputs/resnet18_color_strong_p0_224_frozen_history.json
+    run: [train, --model, resnet18, --augment, strong, --p-random, "0.0",
+          --freeze-backbone, --lr, "${probe_lr}",
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: train_frozen_bg_random
+    experiment: E15
+    produces: outputs/resnet18_color_strong_p70_224_frozen_history.json
+    requires: [data/PlantVillage/raw/segmented]
+    run: [train, --model, resnet18, --augment, strong, --p-random, "0.7",
+          --freeze-backbone, --lr, "${probe_lr}",
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
   - id: train_segmented
     experiment: E9
     produces: outputs/resnet18_segmented_strong_p0_224_history.json
@@ -124,6 +143,45 @@ stages:
     run: [finetune, --model, resnet18, --image-size, "${image_size}",
           --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
           --shots, "0", --epochs, "${ft_epochs}", --tag, ft_full]
+
+  # Score each 224 arm on full PlantDoc with the crop / disease / restricted breakdown.
+  # --image-size is mandatory: these checkpoints are 224, the config default is 128.
+
+  - id: eval_arm_bg_control
+    experiment: E8 control
+    produces: outputs/eval_arm_bg_control.json
+    requires: [outputs/resnet18_color_strong_p0_224_best.pth, data/PlantDoc/.complete]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --image-size, "${image_size}", --models, resnet18,
+          --checkpoints, outputs/resnet18_color_strong_p0_224_best.pth,
+          --out, outputs/eval_arm_bg_control.json]
+
+  - id: eval_arm_bg_random
+    experiment: E8
+    produces: outputs/eval_arm_bg_random.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --image-size, "${image_size}", --models, resnet18,
+          --checkpoints, outputs/resnet18_color_strong_p70_224_best.pth,
+          --out, outputs/eval_arm_bg_random.json]
+
+  - id: eval_arm_frozen_ctrl
+    experiment: E15 control
+    produces: outputs/eval_arm_frozen_ctrl.json
+    requires: [outputs/resnet18_color_strong_p0_224_frozen_best.pth, data/PlantDoc/.complete]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --image-size, "${image_size}", --models, resnet18,
+          --checkpoints, outputs/resnet18_color_strong_p0_224_frozen_best.pth,
+          --out, outputs/eval_arm_frozen_ctrl.json]
+
+  - id: eval_arm_frozen_bg
+    experiment: E15
+    produces: outputs/eval_arm_frozen_bg.json
+    requires: [outputs/resnet18_color_strong_p70_224_frozen_best.pth, data/PlantDoc/.complete]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --image-size, "${image_size}", --models, resnet18,
+          --checkpoints, outputs/resnet18_color_strong_p70_224_frozen_best.pth,
+          --out, outputs/eval_arm_frozen_bg.json]
 
 optional:
   - id: train_bg_random_full

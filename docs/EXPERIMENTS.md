@@ -33,6 +33,37 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H4 | The collapse is a *learned shortcut*, not a test-time statistics shift, so test-time fixes will not repair it. | confirmed |
 | H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **open — needs training** |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
+| H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
+| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | open |
+
+### What the field accuracy is actually made of
+
+Reporting a single 24% hides the failure mode. Decomposing the best zero-shot arm
+(ResNet-18, strong augmentation, `p = 0.7`, 224px) on the PlantDoc test split:
+
+| Level | Accuracy | Chance |
+|---|---|---|
+| All 38 classes | 24.15% | 2.6% |
+| Restricted to the 27 reachable classes | 27.54% | 3.7% |
+| Crop species only | 46.19% | 7.1% |
+| Disease, given the crop was right | 52.29% | ~33% |
+| Healthy vs diseased | 74.58% | 50% |
+
+`0.4619 x 0.5229 = 0.2415`, so the two factors account for the whole number. Once
+the species is right the diagnosis is 1.6x chance, which is weak but real; the
+species itself is right less than half the time. The bottleneck is therefore
+recognising the plant, not recognising the disease.
+
+This is consistent with H2 rather than a separate finding. PlantVillage shows one
+detached leaf, centred, flat, filling the frame; PlantDoc shows whole plants at
+varying scale with overlapping foliage. Leaf outline — the main species cue —
+survives none of that. It also explains why background randomisation buys so
+little (E8): it replaces the background but leaves the single-leaf, centred,
+frontal composition intact, and that composition is the deeper bias.
+
+H8 follows directly. If PlantVillage rewards shortcut features, then updating all
+11.2M weights on it should actively damage the ImageNet features that would have
+transferred, and training only the 19K-parameter head should transfer better.
 
 ### Why we build our own split
 
@@ -75,13 +106,20 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E12 | Leaf segmentation vs official masks (Dice) | H6 | official mask is ground truth | done |
 | E13 | Lesion ratio separates healthy vs diseased (ROC-AUC) | H6 | needs no manual labels | done |
 | E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, graded by the team | open |
+| E15 | Frozen backbone vs full fine-tune, crossed with `p ∈ {0.0, 0.7}` | H8 | 2x2 factorial: separates both main effects and their interaction | open |
+| E16 | Crop / disease / restricted decomposition of every 224 arm | H7 | scored on all 2,525 PlantDoc images, not the 236-image split | open |
 
 ## 4. What would falsify the conclusions
 
 - If E3 scored near 2.6%, and E5 showed attention concentrated on the leaf,
   H2 would be rejected and the 99.8% would be taken at face value.
 - If E8 with `p = 0.0` matched `p = 0.7` on PlantDoc, the gain would be
-  attributable to augmentation alone and H5 would be rejected.
+  attributable to augmentation alone and H5 would be rejected. **This is what we
+  observe**: 23.73% vs 24.15%, a gap far inside the ±5.5pp interval at n = 236.
+  E15 and E16 re-score both arms on all 2,525 images to decide it properly.
+- If the frozen backbone transferred *worse* than the full fine-tune, H8 would be
+  rejected and the low field accuracy would have to be attributed to the domain
+  gap alone rather than to fine-tuning damaging transferable features.
 - If E9 (trained on `segmented`) scored poorly *in-domain*, the E4 collapse
   would be explained by loss of information rather than loss of a shortcut.
 - If E13's AUC were near 0.5, the severity signal would be meaningless.
@@ -105,9 +143,13 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 2. A drop in PlantVillage accuracy when the shortcut is removed is expected and
    is *not* a regression — it is the price of generalisation.
 3. E11 never shares a row with zero-shot numbers.
-4. PlantDoc is web-scraped: a small number of its JPEGs are truncated, and PIL is
+4. Field accuracy is reported over the full 38-class output space as the headline,
+   with the 27-class restricted figure alongside it. Restriction assumes the
+   deployment knows which crops are planted, which is realistic but is an
+   assumption, so it never replaces the unrestricted number.
+5. PlantDoc is web-scraped: a small number of its JPEGs are truncated, and PIL is
    configured to load them rather than abort. Roughly 4% of the repository's file
    names are also invalid on NTFS and are excluded on Windows.
-5. Known threats to validity: PlantDoc carries label noise;
+6. Known threats to validity: PlantDoc carries label noise;
    its train/test splits are known to differ in content; our field evaluation is
    236 images (±5 points), so the full-dataset variant is also reported.

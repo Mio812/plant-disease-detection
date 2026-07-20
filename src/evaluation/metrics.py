@@ -20,7 +20,10 @@ def compute_metrics(y_true, y_pred):
 
 
 def full_report(y_true, y_pred, class_names):
-    return classification_report(y_true, y_pred, target_names=class_names, zero_division=0)
+    # labels= is required: on small evaluation sets some classes appear in neither
+    # y_true nor y_pred, and sklearn would otherwise reject target_names.
+    return classification_report(y_true, y_pred, labels=list(range(len(class_names))),
+                                 target_names=class_names, zero_division=0)
 
 
 def confusion(y_true, y_pred, num_classes):

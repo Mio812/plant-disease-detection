@@ -78,7 +78,9 @@ def summarise(out_dir):
                        ("resnet18_color_strong_p100_224", "Background randomised p=1.0 (E8)"),
                        ("resnet18_segmented_strong_p0_224", "Trained on segmented (E9)"),
                        ("resnet18_grayscale_strong_p0_224", "Trained on grayscale (E10)"),
-                       ("resnet50_color_strong_p70_224", "ResNet-50, p=0.7 (E8)")]:
+                       ("resnet50_color_strong_p70_224", "ResNet-50, p=0.7 (E8)"),
+                       ("resnet18_color_strong_p0_224_frozen", "Frozen backbone (E15 control)"),
+                       ("resnet18_color_strong_p70_224_frozen", "Frozen backbone + bg random (E15)")]:
         d = read(out_dir / f"{tag}_history.json")
         if not d:
             continue
@@ -124,6 +126,22 @@ def summarise(out_dir):
     if val:
         extra.append(f"E14 severity vs manual: rho={val['spearman_rho']:.3f}, "
                      f"kappa={val['quadratic_kappa']:.3f}")
+
+    # Where the field accuracy actually goes: species vs diagnosis, on full PlantDoc.
+    arms = [("bg_control", "Strong aug only"), ("bg_random", "Background randomised"),
+            ("frozen_ctrl", "Frozen backbone"), ("frozen_bg", "Frozen + bg random")]
+    breakdown = [(label, read(out_dir / f"eval_arm_{short}.json")) for short, label in arms]
+    breakdown = [(label, d) for label, d in breakdown if d]
+    if breakdown:
+        head = ["Arm (224px, full PlantDoc)", "All 38", "27 reachable", "Crop", "Disease|crop", "Healthy/diseased"]
+        brows = [[label, f"{d['ensemble']:.2f}", f"{d.get('ensemble_restricted', 0):.2f}",
+                  f"{d['ensemble_crop']:.2f}", f"{d['ensemble_disease_given_crop']:.2f}",
+                  f"{d['ensemble_binary']:.2f}"] for label, d in breakdown]
+        w = [max(len(r[i]) for r in [head] + brows) for i in range(6)]
+        lines.append("")
+        lines.append("| " + " | ".join(h.ljust(w[i]) for i, h in enumerate(head)) + " |")
+        lines.append("|" + "|".join("-" * (x + 2) for x in w) + "|")
+        lines += ["| " + " | ".join(r[i].ljust(w[i]) for i in range(6)) + " |" for r in brows]
 
     text = "\n".join(lines) + ("\n\n" + "\n".join(extra) if extra else "") + "\n"
     (out_dir / "results_summary.md").write_text(text, encoding="utf-8")

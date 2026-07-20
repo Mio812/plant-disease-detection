@@ -37,6 +37,43 @@ class CustomCNN(nn.Module):
         return self.classifier(x)
 
 
+HEADS = {"custom_cnn": "classifier", "resnet18": "fc", "resnet50": "fc",
+         "mobilenet_v2": "classifier", "efficientnet_b0": "classifier"}
+
+
+def freeze_backbone(model, name):
+    """Train only the classification head, leaving the pretrained features untouched.
+
+    BatchNorm running statistics are frozen as well: if they were left to re-estimate
+    they would absorb PlantVillage's uniform-background statistics, which is exactly
+    the domain information this arm is meant to exclude.
+    """
+    head = HEADS[name.lower()]
+    for param in model.parameters():
+        param.requires_grad = False
+    for param in getattr(model, head).parameters():
+        param.requires_grad = True
+
+    original_train = model.train
+
+    def train(mode=True):
+        original_train(mode)
+        if mode:
+            for module in model.modules():
+                if isinstance(module, nn.modules.batchnorm._BatchNorm):
+                    module.eval()
+        return model
+
+    model.train = train
+    return model
+
+
+def trainable_parameters(model):
+    total = sum(p.numel() for p in model.parameters())
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return trainable, total
+
+
 def build_model(name, num_classes, pretrained=True):
     name = name.lower()
     if name == "custom_cnn":
