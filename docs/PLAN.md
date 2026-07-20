@@ -55,20 +55,49 @@ conclusion.
 
 Nothing else may touch `src/` or `scripts/` until these finish.
 
-## What the project is graded against
+## What the project is
 
-090 is the core and everything is ordered by it. Its two tasks:
+**090 is the whole project.** Deliver both its tasks excellently on PlantVillage,
+then add PlantDoc as a bonus. PlantDoc is kept but subordinate — a Discussion-level
+generalization check, never the headline, done only after 090 is complete. Do not
+frame this as two projects. (User directive, 2026-07-20.)
 
-1. a CNN that categorises leaves into **healthy and diseased** classes
+Its two tasks:
+
+1. a CNN that categorises leaves into **healthy and diseased** classes (and the
+   specific disease)
 2. the model **expanded** to estimate **disease severity from image features**
 
-073 is an extension: it tests whether task 1 survives outside the lab. Useful,
-never co-equal.
+### Definition of done — "perfect 090"
 
-Weighting matters here. Task 2 is half the brief and currently carries three
-experiments (E12, E13, E14) against roughly twenty on classification, and E14 has
-no progress at all. Work is ordered to correct that, not to keep deepening the
-half that is already strong.
+**Task 1 — classification**
+- [ ] three CNN baselines (custom_cnn, resnet18, mobilenet_v2) + soft-voting
+      ensemble, on the honest leaf-grouped split *(rebuilding now)*
+- [ ] healthy/diseased binary **and** 38-way specific disease, reported together
+- [ ] all three variants exercised: color (primary), grayscale, segmented
+- [ ] per-class precision/recall shown, so the 36x imbalance is demonstrated not to
+      sink rare classes (rather than asserting it)
+- [ ] honest numbers stated beside the leaky ones, leakage quantified
+
+**Task 2 — severity from image features**
+- [ ] a severity **head on the CNN** (E25/E26) — this is what literally satisfies
+      "expand the model", even where the classical Otsu ratio grades finer
+- [ ] the estimator reported honestly: presence AUC, within-class rho vs Otsu
+- [ ] **E14** — 150 human grades, the only external check. Still 0. The gate.
+
+**Core 090 analysis (exploratory + discussion, not bonus)**
+- [ ] leaf-leakage / test integrity — the split fix and its inflation number
+- [ ] E3 border-pixel probe, E5 Grad-CAM — what the classifier attends to
+- [ ] E10 grayscale colour ablation
+- [ ] class-distribution / imbalance characterization
+
+**Only once the above is solid — the PlantDoc bonus**
+- [ ] E6 zero-shot field, E11/E18 adaptation, E16 decomposition — as a Discussion
+      generalization check ("does the lab number hold in the field? no, and here is
+      why"), explicitly a bonus
+
+Weighting: Task 2 is half of 090 and still carries the least evidence (E14 at 0/150),
+so it is not allowed to trail classification the way it currently does.
 
 ## Order of execution
 
