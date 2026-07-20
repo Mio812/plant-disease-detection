@@ -61,7 +61,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # --------------------------------------------- severity sheet (unblocks team)
 if (-not (Test-Path "outputs\severity_annotations.csv")) {
-    [void](Invoke-Step "sample leaves for severity grading" @("run", "python", "-m", "scripts.severity_sample", "--n", "150"))
+    [void](Invoke-Step "sample leaves for severity grading" @("run", "python", "-m", "scripts.audit", "--probe", "severity-sample", "--n", "150"))
     Say "Grade 'manual_grade' (0-3) in outputs\severity_annotations.csv while training runs." "Yellow"
 }
 
@@ -83,11 +83,11 @@ if ($FullAblation) { $full += "--full-ablation" }
 $graded = & uv run python -c "import csv,sys,os; p='outputs/severity_annotations.csv'; r=list(csv.DictReader(open(p,encoding='utf-8'))) if os.path.exists(p) else []; print(sum(1 for x in r if x.get('manual_grade','').strip()))" 2>$null
 if ([int]$graded -gt 0) {
     Say "$graded rows graded - validating severity"
-    [void](Invoke-Step "severity validation" @("run", "python", "-m", "scripts.severity_validate", "--csv", "outputs/severity_annotations.csv"))
+    [void](Invoke-Step "severity validation" @("run", "python", "-m", "scripts.audit", "--probe", "severity-validate", "--csv", "outputs/severity_annotations.csv"))
     [void](Invoke-Step "refresh summary" @("run", "python", "-m", "scripts.run_all"))
 } else {
     Say "No severity grades yet. After grading, run:" "Yellow"
-    Say "  uv run python -m scripts.severity_validate --csv outputs/severity_annotations.csv" "Yellow"
+    Say "  uv run python -m scripts.audit --probe severity-validate" "Yellow"
     Say "  uv run python -m scripts.run_all    # refreshes the summary" "Yellow"
 }
 

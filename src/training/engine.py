@@ -5,8 +5,8 @@ import copy
 import torch
 from tqdm import tqdm
 
-from .metrics import compute_metrics
-from .utils import AverageMeter, save_checkpoint
+from ..evaluation.metrics import compute_metrics
+from ..utils import AverageMeter, save_checkpoint
 
 
 def train_one_epoch(model, loader, criterion, optimizer, device):

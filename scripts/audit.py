@@ -1,0 +1,244 @@
+"""Probes that test what the classifier is actually using, and whether the
+severity estimate means anything.
+
+    --probe background         predict the class from background pixels alone
+    --probe gradcam            how much explanation mass lands on the leaf
+    --probe severity           label-free severity validation (Dice + ROC-AUC)
+    --probe severity-sample    emit a CSV of leaves for manual grading
+    --probe severity-validate  score the ordinal grade against manual grades
+
+Usage:
+    python -m scripts.audit --probe background
+    python -m scripts.audit --probe gradcam --model resnet18
+"""
+
+import argparse
+import csv
+import json
+import random
+from pathlib import Path
+
+import cv2
+import numpy as np
+import torch
+from PIL import Image
+from torchvision.datasets import ImageFolder
+
+from src.audit import border_features, grad_cam, leaf_attention, target_layer
+from src.audit.severity import (
+    estimate_severity,
+    leaf_mask_from_segmented,
+    lesion_ratio,
+    severity_level,
+)
+from src.config import Config
+from src.data import build_transforms, name_key, splits_from_config, variant_index, variant_root
+from src.evaluation import load_model
+from src.utils import get_device, set_seed
+
+
+def _base_and_segmented(cfg):
+    base = ImageFolder(cfg.data.root)
+    return base, variant_root(cfg.data.root, "segmented")
+
+
+def probe_background(cfg, args):
+    """A classifier trained on border pixels alone should sit near 1/38."""
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.preprocessing import StandardScaler
+
+    base = ImageFolder(cfg.data.root)
+    train_idx, _, test_idx = splits_from_config(cfg, len(base))
+    rows, seen = [], {}
+    for split, indices, cap in (("train", train_idx, args.per_class_train),
+                                ("test", test_idx, args.per_class_test)):
+        for i in indices:
+            _, label = base.samples[i]
+            key = (split, label)
+            if seen.get(key, 0) >= cap:
+                continue
+            seen[key] = seen.get(key, 0) + 1
+            rows.append((base.samples[i][0], label, split == "train"))
+
+    X = np.array([border_features(p) for p, _, _ in rows], dtype=np.float32)
+    y = np.array([lab for _, lab, _ in rows])
+    is_train = np.array([tr for _, _, tr in rows])
+    scaler = StandardScaler().fit(X[is_train])
+    clf = LogisticRegression(max_iter=2000).fit(scaler.transform(X[is_train]), y[is_train])
+    accuracy = float(clf.score(scaler.transform(X[~is_train]), y[~is_train]))
+    print(f"  border pixels used : {X.shape[1] // 3}")
+    print(f"  train {int(is_train.sum())} / test {int((~is_train).sum())} over {len(base.classes)} classes")
+    print(f"  TEST ACCURACY = {accuracy * 100:.1f}%   (chance {100 / len(base.classes):.1f}%)")
+    return "bias_probe.json", {"n_pixels": X.shape[1] // 3, "test_accuracy": accuracy,
+                               "chance": 1 / len(base.classes)}
+
+
+def probe_gradcam(cfg, args):
+    base, seg_root = _base_and_segmented(cfg)
+    device = get_device()
+    checkpoint = args.checkpoint or f"{cfg.output_dir}/{args.model}_best.pth"
+    model = load_model(args.model, len(base.classes), checkpoint, device)
+    transform = build_transforms(cfg.data.image_size, train=False)
+
+    rng = random.Random(cfg.seed)
+    diseased = [i for i, (_, l) in enumerate(base.samples)
+                if "healthy" not in base.classes[l].lower()]
+    chosen = rng.sample(diseased, min(args.n, len(diseased)))
+    index, inside, area = {}, [], []
+    size = (cfg.data.image_size, cfg.data.image_size)
+
+    for start in range(0, len(chosen), 16):
+        tensors, masks = [], []
+        for i in chosen[start:start + 16]:
+            path, label = base.samples[i]
+            class_name = base.classes[label]
+            if class_name not in index:
+                index[class_name] = variant_index(seg_root, class_name)
+            twin = index[class_name].get(name_key(Path(path).name))
+            seg = cv2.imread(twin) if twin else None
+            if seg is None:
+                continue
+            masks.append(cv2.resize(seg, size).sum(axis=2) > 25)
+            tensors.append(transform(Image.open(path).convert("RGB")))
+        if not tensors:
+            continue
+        cams, _ = grad_cam(model, target_layer(model, args.model), torch.stack(tensors), device)
+        for cam, mask in zip(cams, masks):
+            a, b = leaf_attention(cam, mask)
+            inside.append(a)
+            area.append(b)
+
+    summary = {"model": args.model, "n": len(inside),
+               "mean_attention_in_leaf": float(np.mean(inside)),
+               "mean_leaf_area_fraction": float(np.mean(area)),
+               "attention_lift_over_area": float(np.mean(inside) - np.mean(area))}
+    print(f"  Grad-CAM mass inside the leaf : {summary['mean_attention_in_leaf'] * 100:.1f}%")
+    print(f"  leaf share of image area      : {summary['mean_leaf_area_fraction'] * 100:.1f}%")
+    print(f"  lift over the area baseline   : {summary['attention_lift_over_area'] * 100:+.1f} points")
+    return "gradcam_audit.json", summary
+
+
+def probe_severity(cfg, args):
+    """Without manual labels: does the lesion ratio separate healthy from diseased?"""
+    from sklearn.metrics import roc_auc_score
+
+    base, seg_root = _base_and_segmented(cfg)
+    healthy_idx, diseased_idx = [], []
+    for i, (_, label) in enumerate(base.samples):
+        (healthy_idx if "healthy" in base.classes[label].lower() else diseased_idx).append(i)
+    rng = random.Random(cfg.seed)
+    chosen = ([(i, 0) for i in rng.sample(healthy_idx, min(args.n, len(healthy_idx)))] +
+              [(i, 1) for i in rng.sample(diseased_idx, min(args.n, len(diseased_idx)))])
+
+    index, rows, dices = {}, [], []
+    for i, is_diseased in chosen:
+        path, label = base.samples[i]
+        image = cv2.imread(path)
+        if image is None:
+            continue
+        class_name = base.classes[label]
+        if class_name not in index:
+            index[class_name] = variant_index(seg_root, class_name)
+        twin = index[class_name].get(name_key(Path(path).name))
+        official = None
+        if twin:
+            seg = cv2.imread(twin)
+            if seg is not None:
+                mask = leaf_mask_from_segmented(cv2.resize(seg, image.shape[1::-1]))
+                official = lesion_ratio(image, mask)
+        rows.append((is_diseased, lesion_ratio(image), official))
+
+    y = np.array([r[0] for r in rows])
+    otsu = np.array([r[1] for r in rows])
+    have = np.array([r[2] is not None for r in rows])
+    official = np.array([r[2] if r[2] is not None else 0.0 for r in rows])
+    levels, thresholds = list(cfg.severity.levels), list(cfg.severity.thresholds)
+    grades = [severity_level(r, thresholds, levels) for r in official[have & (y == 1)]]
+
+    summary = {"n": len(rows),
+               "auc_otsu_mask": float(roc_auc_score(y, otsu)),
+               "auc_official_mask": float(roc_auc_score(y[have], official[have])),
+               "mean_ratio_healthy_official": float(official[have & (y == 0)].mean()),
+               "mean_ratio_diseased_official": float(official[have & (y == 1)].mean()),
+               "diseased_grade_distribution": {lv: grades.count(lv) for lv in levels}}
+    print(f"  ROC-AUC healthy vs diseased, Otsu mask     : {summary['auc_otsu_mask']:.3f}")
+    print(f"  ROC-AUC healthy vs diseased, official mask : {summary['auc_official_mask']:.3f}")
+    print(f"  mean lesion ratio  healthy {summary['mean_ratio_healthy_official']:.3f} "
+          f"| diseased {summary['mean_ratio_diseased_official']:.3f}")
+    print(f"  diseased grades: {summary['diseased_grade_distribution']}")
+    return "severity_probe.json", summary
+
+
+def probe_severity_sample(cfg, args):
+    base = ImageFolder(cfg.data.root)
+    diseased = [i for i, (_, l) in enumerate(base.samples)
+                if "healthy" not in base.classes[l].lower()]
+    chosen = random.Random(cfg.seed).sample(diseased, min(args.n, len(diseased)))
+    out = Path(cfg.output_dir) / "severity_annotations.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["path", "class", "lesion_ratio", "estimated_level", "manual_grade"])
+        for i in chosen:
+            path, label = base.samples[i]
+            level, ratio = estimate_severity(cv2.imread(path), cfg.severity.thresholds,
+                                             cfg.severity.levels)
+            writer.writerow([path, base.classes[label], f"{ratio:.4f}", level, ""])
+    print(f"  wrote {len(chosen)} rows to {out.as_posix()} - fill in `manual_grade` (0-3)")
+    return None, None
+
+
+def probe_severity_validate(cfg, args):
+    from scipy.stats import spearmanr
+    from sklearn.metrics import cohen_kappa_score
+
+    levels = list(cfg.severity.levels)
+    ratios, predicted, manual = [], [], []
+    with open(args.csv, encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            if not row["manual_grade"].strip():
+                continue
+            ratios.append(float(row["lesion_ratio"]))
+            predicted.append(levels.index(row["estimated_level"]))
+            manual.append(int(row["manual_grade"]))
+    if not manual:
+        raise SystemExit("No graded rows - fill in the manual_grade column first.")
+    predicted, manual = np.array(predicted), np.array(manual)
+    rho, p = spearmanr(ratios, manual)
+    summary = {"n_graded": len(manual), "spearman_rho": float(rho), "spearman_p": float(p),
+               "mae_levels": float(np.abs(predicted - manual).mean()),
+               "exact_agreement": float((predicted == manual).mean()),
+               "quadratic_kappa": float(cohen_kappa_score(predicted, manual, weights="quadratic"))}
+    for k, v in summary.items():
+        print(f"  {k}: {v:.4f}" if isinstance(v, float) else f"  {k}: {v}")
+    return "severity_validation.json", summary
+
+
+PROBES = {"background": probe_background, "gradcam": probe_gradcam, "severity": probe_severity,
+          "severity-sample": probe_severity_sample, "severity-validate": probe_severity_validate}
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Audit probes for the classifier and severity.")
+    parser.add_argument("--probe", choices=sorted(PROBES), required=True)
+    parser.add_argument("--config", default="configs/default.yaml")
+    parser.add_argument("--model", default="resnet18")
+    parser.add_argument("--checkpoint", default=None)
+    parser.add_argument("--n", type=int, default=150)
+    parser.add_argument("--per-class-train", type=int, default=100)
+    parser.add_argument("--per-class-test", type=int, default=50)
+    parser.add_argument("--csv", default="outputs/severity_annotations.csv")
+    args = parser.parse_args()
+
+    cfg = Config.load(args.config)
+    set_seed(cfg.seed)
+    print(f"probe: {args.probe}")
+    filename, summary = PROBES[args.probe](cfg, args)
+    if filename:
+        out = Path(cfg.output_dir) / filename
+        out.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        print(f"  saved {out.as_posix()}")
+
+
+if __name__ == "__main__":
+    main()

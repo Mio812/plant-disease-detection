@@ -1,0 +1,116 @@
+# Declarative experiment matrix. Stage ids and `experiment` fields refer to
+# docs/EXPERIMENTS.md, so every run here exists to test a stated hypothesis.
+#
+# `produces` makes the pipeline resumable: a stage whose output already exists
+# is skipped. `requires` blocks a stage until its inputs are present.
+# ${epochs}, ${ft_epochs}, ${image_size} and ${weights} are substituted.
+
+defaults:
+  epochs: 20
+  ft_epochs: 15
+  image_size: 224
+  weights: [0.2, 0.5, 0.3]
+
+stages:
+  - id: prepare
+    experiment: "-"
+    produces: data/PlantDoc/train
+    run: [prepare_data, --dataset, both]
+
+  - id: eval_lab
+    experiment: E1,E2
+    produces: outputs/eval_plantvillage.json
+    requires: [outputs/resnet18_best.pth]
+    run: [evaluate, --on, plantvillage, --save-reports, --weights, "${weights}"]
+
+  - id: bias_probe
+    experiment: E3
+    produces: outputs/bias_probe.json
+    run: [audit, --probe, background]
+
+  - id: eval_segmented
+    experiment: E4
+    produces: outputs/eval_segmented.json
+    requires: [outputs/resnet18_best.pth]
+    run: [evaluate, --on, segmented, --weights, "${weights}"]
+
+  - id: gradcam
+    experiment: E5
+    produces: outputs/gradcam_audit.json
+    requires: [outputs/resnet18_best.pth]
+    run: [audit, --probe, gradcam, --model, resnet18, --n, "60"]
+
+  - id: eval_field
+    experiment: E6
+    produces: outputs/eval_plantdoc.json
+    requires: [data/PlantDoc/test]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, --weights, "${weights}"]
+
+  - id: eval_field_full
+    experiment: E6
+    produces: outputs/eval_plantdoc_full.json
+    requires: [data/PlantDoc/train]
+    run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
+          --weights, "${weights}", --out, outputs/eval_plantdoc_full.json]
+
+  - id: severity_probe
+    experiment: E12,E13
+    produces: outputs/severity_probe.json
+    run: [audit, --probe, severity, --n, "150"]
+
+  - id: severity_sample
+    experiment: E14
+    produces: outputs/severity_annotations.csv
+    run: [audit, --probe, severity-sample, --n, "150"]
+
+  - id: train_aug_only
+    experiment: E8 control
+    produces: outputs/resnet18_color_strong_p0_224_history.json
+    run: [train, --model, resnet18, --augment, strong, --p-random, "0.0",
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: train_bg_random
+    experiment: E8
+    produces: outputs/resnet18_color_strong_p70_224_history.json
+    run: [train, --model, resnet18, --augment, strong, --p-random, "0.7",
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: train_segmented
+    experiment: E9
+    produces: outputs/resnet18_segmented_strong_p0_224_history.json
+    run: [train, --model, resnet18, --variant, segmented, --augment, strong,
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: train_grayscale
+    experiment: E10
+    produces: outputs/resnet18_grayscale_strong_p0_224_history.json
+    run: [train, --model, resnet18, --variant, grayscale, --augment, strong,
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: finetune_robust
+    experiment: E11
+    produces: outputs/ft_robust_history.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/train]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
+          --shots, "20", --epochs, "${ft_epochs}", --tag, ft_robust]
+
+  - id: finetune_baseline
+    experiment: E11
+    produces: outputs/ft_baseline_history.json
+    requires: [outputs/resnet18_best.pth, data/PlantDoc/train]
+    run: [finetune, --model, resnet18, --checkpoint, outputs/resnet18_best.pth,
+          --shots, "20", --epochs, "${ft_epochs}", --tag, ft_baseline]
+
+optional:
+  - id: train_bg_random_full
+    experiment: E8
+    produces: outputs/resnet18_color_strong_p100_224_history.json
+    run: [train, --model, resnet18, --augment, strong, --p-random, "1.0",
+          --image-size, "${image_size}", --epochs, "${epochs}"]
+
+  - id: train_resnet50
+    experiment: E8
+    produces: outputs/resnet50_color_strong_p70_224_history.json
+    run: [train, --model, resnet50, --augment, strong, --p-random, "0.7",
+          --image-size, "${image_size}", --epochs, "${epochs}"]

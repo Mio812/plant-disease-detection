@@ -16,7 +16,7 @@ from PIL import Image
 from src.config import Config
 from src.data import build_transforms, parse_class_name
 from src.models import build_model
-from src.severity import estimate_severity
+from src.audit.severity import estimate_severity
 from src.utils import get_device, load_checkpoint
 
 

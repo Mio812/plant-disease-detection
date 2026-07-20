@@ -36,45 +36,35 @@ scripts and the notebook.
 ```
 plant-disease-detection/
 ├── README.md
+├── run.ps1                     # one-command driver (Windows)
 ├── pyproject.toml              # uv project + dependencies (canonical)
-├── uv.lock                     # pinned, reproducible resolution
-├── requirements.txt            # pip fallback
-├── .python-version             # interpreter pin for uv (3.12)
-├── .vscode/                    # shared editor / debug configuration
 ├── configs/
-│   └── default.yaml            # all hyper-parameters and paths
+│   ├── default.yaml            # hyper-parameters and paths
+│   └── experiments.yaml        # the declarative experiment matrix
+├── docs/
+│   └── EXPERIMENTS.md          # research question, hypotheses, experiment plan
 ├── src/
 │   ├── config.py               # typed YAML config loader
-│   ├── data.py                 # transforms, splits, dataloaders
-│   ├── models.py               # custom CNN + transfer-learning backbones
-│   ├── engine.py               # train / evaluate loops, early stopping
-│   ├── metrics.py              # accuracy, P/R/F1, confusion matrix
-│   ├── severity.py             # lesion-area severity estimation
-│   ├── ensemble.py             # soft-voting ensemble of the baselines
-│   ├── bias.py                 # background-bias probes, segmented-mask matching
-│   ├── crossdata.py            # PlantDoc -> PlantVillage class mapping
-│   ├── visualize.py            # EDA and results plots
-│   └── utils.py                # seed, device, checkpoints
+│   ├── utils.py                # seed, device, checkpoints
+│   ├── data/                   # splits (single source of truth), variants,
+│   │                           #   PlantVillage loaders, PlantDoc mapping
+│   ├── models/                 # architectures + soft-voting ensemble
+│   ├── training/               # optimisation loops, augmentation, background randomisation
+│   ├── evaluation/             # metrics, one inference path, plots
+│   └── audit/                  # background probe, Grad-CAM, severity
 ├── scripts/
-│   ├── download_data.py        # fetch PlantVillage into data/
-│   ├── download_plantdoc.py    # fetch the PlantDoc field-image test split
-│   ├── train.py                # train from a config
-│   ├── train_robust.py         # background randomisation / segmented training
-│   ├── evaluate.py             # evaluate a checkpoint on the test split
-│   ├── predict.py              # classify + estimate severity for one image
-│   ├── ensemble.py             # evaluate the soft-voting ensemble
-│   ├── run_all.py              # resumable driver for the whole pipeline
-│   ├── bias_probe.py           # predict the class from background pixels alone
-│   ├── eval_segmented.py       # re-score models with the background removed
-│   ├── eval_plantdoc.py        # zero-shot evaluation on field images
-│   ├── severity_probe.py       # severity validation without manual labels
-│   ├── severity_sample.py      # sample leaves for manual severity grading
-│   ├── severity_validate.py    # score severity against manual grades
-│   └── gradcam.py              # Grad-CAM plus leaf-attention audit
+│   ├── prepare_data.py         # download PlantVillage and PlantDoc
+│   ├── train.py                # every training variant behind one entry point
+│   ├── evaluate.py             # --on plantvillage | segmented | grayscale | plantdoc
+│   ├── ensemble.py             # validation-tuned soft voting
+│   ├── audit.py                # --probe background | gradcam | severity | ...
+│   ├── finetune.py             # supervised adaptation on PlantDoc
+│   ├── predict.py              # classify + grade a single leaf
+│   └── run_all.py              # executes configs/experiments.yaml
 ├── notebooks/
 │   └── plant_disease_detection.ipynb
 ├── report/                     # summary report (.docx) and slides (.pptx)
-└── outputs/                    # checkpoints, metrics, plots (created at runtime)
+└── outputs/                    # checkpoints, metrics, figures (created at runtime)
 ```
 
 ## Dataset

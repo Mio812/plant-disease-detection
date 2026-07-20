@@ -22,9 +22,9 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from torchvision.datasets import ImageFolder
 
-from src.augment import build_strong_transforms
+from src.training import build_strong_transforms
 from src.config import Config
-from src.crossdata import plantdoc_items
+from src.data import plantdoc_items
 from src.data import build_transforms
 from src.models import build_model
 from src.utils import get_device, load_checkpoint, set_seed

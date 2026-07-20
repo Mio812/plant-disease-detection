@@ -8,8 +8,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from .models import build_model
-from .utils import load_checkpoint
+from .factory import build_model
+from ..utils import load_checkpoint
 
 
 @torch.no_grad()

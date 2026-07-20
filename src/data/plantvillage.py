@@ -7,6 +7,8 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 
+from .splits import splits_from_config
+
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
 
@@ -56,15 +58,7 @@ def parse_class_name(name):
 
 def get_dataloaders(cfg):
     base = ImageFolder(cfg.data.root)
-    n_total = len(base)
-    n_test = int(n_total * cfg.data.test_split)
-    n_val = int(n_total * cfg.data.val_split)
-
-    generator = torch.Generator().manual_seed(cfg.seed)
-    perm = torch.randperm(n_total, generator=generator).tolist()
-    test_idx = perm[:n_test]
-    val_idx = perm[n_test : n_test + n_val]
-    train_idx = perm[n_test + n_val :]
+    train_idx, val_idx, test_idx = splits_from_config(cfg, len(base))
 
     train_tf = build_transforms(cfg.data.image_size, train=True)
     eval_tf = build_transforms(cfg.data.image_size, train=False)
@@ -111,32 +105,3 @@ class ItemDataset(Dataset):
 
         path, label = self.items[i]
         return self.transform(Image.open(path).convert("RGB")), label
-
-
-def variant_samples(base, indices, variant, variant_root):
-    """Map dataset indices onto another PlantVillage variant.
-
-    The split is always derived from the colour ImageFolder so every variant
-    sees exactly the same physical leaves. Filenames differ between variants
-    (UUID prefixes, ``_final_masked`` suffixes), so they are matched on the
-    original-name key rather than on the path.
-    """
-    from .bias import name_key, segmented_index
-
-    if variant == "color":
-        return [base.samples[i] for i in indices]
-    index, items = {}, []
-    for i in indices:
-        path, label = base.samples[i]
-        class_name = base.classes[label]
-        if class_name not in index:
-            index[class_name] = segmented_index(variant_root, class_name)
-        twin = index[class_name].get(name_key(Path(path).name))
-        if twin is not None:
-            items.append((twin, label))
-    return items
-
-
-def variant_root(colour_root, variant):
-    """Path of a sibling PlantVillage variant directory."""
-    return str(Path(colour_root).parent / variant)

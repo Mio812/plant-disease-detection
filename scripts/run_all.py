@@ -1,15 +1,14 @@
-"""Run the whole experimental pipeline end to end, resumably.
+"""Run the experiment matrix declared in configs/experiments.yaml.
 
-Every stage declares the file it produces, so a stage whose output already
-exists is skipped. The run can therefore be interrupted at any point and
-restarted with the same command. When all stages have run, a comparison table
-is written to ``outputs/results_summary.md``.
+Stages are resumable: one whose `produces` file already exists is skipped, so an
+interrupted run is continued by re-issuing the same command. Stage ids and their
+`experiment` fields map onto docs/EXPERIMENTS.md.
 
 Usage:
-    python -m scripts.run_all                     # full pipeline
-    python -m scripts.run_all --quick             # 2-epoch smoke test
-    python -m scripts.run_all --dry-run           # show the plan only
-    python -m scripts.run_all --only robust_p70 ft_robust
+    python -m scripts.run_all --dry-run
+    python -m scripts.run_all --quick            # 2 epochs, isolated outputs
+    python -m scripts.run_all --optional         # include the extra ablations
+    python -m scripts.run_all --only train_bg_random
 """
 
 import argparse
@@ -23,153 +22,109 @@ import yaml
 
 from src.config import Config
 
-W = ["0.2", "0.5", "0.3"]          # validation-tuned ensemble weights
+
+def expand(tokens, defaults):
+    """Substitute ${...} placeholders; ${weights} expands into several arguments."""
+    out = []
+    for token in tokens:
+        text = str(token)
+        if text == "${weights}":
+            out.extend(str(w) for w in defaults["weights"])
+        elif text.startswith("${") and text.endswith("}"):
+            out.append(str(defaults[text[2:-1]]))
+        else:
+            out.append(text)
+    return out
 
 
-def stages(epochs, ft_epochs, full_ablation):
-    plan = [
-        ("download_plantdoc", "data/PlantDoc/train", [],
-         ["download_plantdoc", "--split", "both"]),
-        ("bias_probe", "outputs/bias_probe.json", [],
-         ["bias_probe"]),
-        ("eval_segmented", "outputs/segmented_results.json", ["outputs/resnet18_best.pth"],
-         ["eval_segmented", "--weights", *W]),
-        ("plantdoc_full", "outputs/plantdoc_full.json", ["data/PlantDoc/train"],
-         ["eval_plantdoc", "--weights", *W, "--plantdoc", "data/PlantDoc/test",
-          "data/PlantDoc/train", "--out", "outputs/plantdoc_full.json"]),
-        ("plantdoc_test", "outputs/plantdoc_test.json", ["data/PlantDoc/test"],
-         ["eval_plantdoc", "--weights", *W, "--plantdoc", "data/PlantDoc/test",
-          "--out", "outputs/plantdoc_test.json"]),
-        ("severity_probe", "outputs/severity_probe.json", [],
-         ["severity_probe", "--n", "150"]),
-        ("gradcam", "outputs/gradcam_audit.json", ["outputs/resnet18_best.pth"],
-         ["gradcam", "--model", "resnet18", "--n", "60"]),
-        ("robust_p0", "outputs/resnet18_color_p0_224_history.json", [],
-         ["train_robust", "--model", "resnet18", "--image-size", "224",
-          "--p-random", "0.0", "--epochs", str(epochs)]),
-        ("robust_p70", "outputs/resnet18_color_p70_224_history.json", [],
-         ["train_robust", "--model", "resnet18", "--image-size", "224",
-          "--p-random", "0.7", "--epochs", str(epochs)]),
-        ("robust_segmented", "outputs/resnet18_segmented_p0_224_history.json", [],
-         ["train_robust", "--model", "resnet18", "--image-size", "224",
-          "--variant", "segmented", "--epochs", str(epochs)]),
-        ("robust_grayscale", "outputs/resnet18_grayscale_p0_224_history.json", [],
-         ["train_robust", "--model", "resnet18", "--image-size", "224",
-          "--variant", "grayscale", "--epochs", str(epochs)]),
-    ]
-    if full_ablation:
-        plan += [
-            ("robust_p100", "outputs/resnet18_color_p100_224_history.json", [],
-             ["train_robust", "--model", "resnet18", "--image-size", "224",
-              "--p-random", "1.0", "--epochs", str(epochs)]),
-            ("robust_r50", "outputs/resnet50_color_p70_224_history.json", [],
-             ["train_robust", "--model", "resnet50", "--image-size", "224",
-              "--p-random", "0.7", "--epochs", str(epochs)]),
-        ]
-    plan += [
-        ("ft_robust", "outputs/ft_robust_history.json",
-         ["outputs/resnet18_color_p70_224_best.pth", "data/PlantDoc/train"],
-         ["finetune_plantdoc", "--model", "resnet18", "--image-size", "224",
-          "--checkpoint", "outputs/resnet18_color_p70_224_best.pth",
-          "--shots", "20", "--epochs", str(ft_epochs), "--tag", "ft_robust"]),
-        ("ft_baseline", "outputs/ft_baseline_history.json",
-         ["outputs/resnet18_best.pth", "data/PlantDoc/train"],
-         ["finetune_plantdoc", "--model", "resnet18",
-          "--checkpoint", "outputs/resnet18_best.pth",
-          "--shots", "20", "--epochs", str(ft_epochs), "--tag", "ft_baseline"]),
-        ("severity_sample", "outputs/severity_annotations.csv", [],
-         ["severity_sample", "--n", "150"]),
-    ]
-    return plan
+def load_plan(path, include_optional):
+    spec = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    stages = list(spec["stages"]) + (list(spec.get("optional", [])) if include_optional else [])
+    return spec.get("defaults", {}), stages
 
 
-def retarget(plan, out_dir, config_path):
-    """Point every path and every --config at the active output directory."""
+def retarget(stages, out_dir, config_path):
+    """Point paths and --config at the active output directory."""
     fixed = []
-    for name, produces, requires, argv in plan:
-        swap = lambda s: s.replace("outputs/", f"{out_dir}/") if out_dir != "outputs" else s
-        if argv[0] != "download_plantdoc":
-            argv = [*argv, "--config", config_path]
-        fixed.append((name, swap(produces), [swap(r) for r in requires],
-                      [swap(a) for a in argv]))
+    for stage in stages:
+        stage = dict(stage)
+        if out_dir != "outputs":
+            stage["produces"] = stage["produces"].replace("outputs/", f"{out_dir}/")
+            stage["requires"] = [r.replace("outputs/", f"{out_dir}/")
+                                 for r in stage.get("requires", [])]
+            stage["run"] = [str(a).replace("outputs/", f"{out_dir}/") for a in stage["run"]]
+        if stage["run"][0] != "prepare_data":
+            stage["run"] = list(stage["run"]) + ["--config", config_path]
+        fixed.append(stage)
     return fixed
 
 
-def load(path):
+def read(path):
     p = Path(path)
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
 
 
 def summarise(out_dir):
     rows = []
-
-    def acc(d, *keys):
-        for k in keys:
-            if isinstance(d, dict) and k in d:
-                d = d[k]
-            else:
-                return None
-        return d if isinstance(d, (int, float)) else None
-
-    ens = load(out_dir / "ensemble_history.json")
-    seg = load(out_dir / "segmented_results.json")
-    pdt = load(out_dir / "plantdoc_test.json")
-    pdf = load(out_dir / "plantdoc_full.json")
-    base_pv = acc(ens, "test_metrics", "accuracy")
+    lab = read(out_dir / "eval_plantvillage.json")
+    seg = read(out_dir / "eval_segmented.json")
+    field = read(out_dir / "eval_plantdoc.json")
     rows.append(["Baseline ensemble (128px)",
-                 f"{base_pv * 100:.2f}" if base_pv else "-",
+                 f"{lab['ensemble']:.2f}" if lab else "-",
                  f"{seg['ensemble']:.2f}" if seg else "-",
-                 f"{pdt['ensemble']:.2f}" if pdt else "-"])
+                 f"{field['ensemble']:.2f}" if field else "-"])
 
-    for tag, label in [("resnet18_color_p0_224", "Strong aug only (p=0.0)"),
-                       ("resnet18_color_p70_224", "Background randomised (p=0.7)"),
-                       ("resnet18_segmented_p0_224", "Trained on segmented"),
-                       ("resnet18_grayscale_p0_224", "Trained on grayscale"),
-                       ("resnet18_color_p100_224", "Background randomised (p=1.0)"),
-                       ("resnet50_color_p70_224", "ResNet-50, p=0.7")]:
-        d = load(out_dir / f"{tag}_history.json")
+    for tag, label in [("resnet18_color_strong_p0_224", "Strong aug only (E8 control)"),
+                       ("resnet18_color_strong_p70_224", "Background randomised p=0.7 (E8)"),
+                       ("resnet18_color_strong_p100_224", "Background randomised p=1.0 (E8)"),
+                       ("resnet18_segmented_strong_p0_224", "Trained on segmented (E9)"),
+                       ("resnet18_grayscale_strong_p0_224", "Trained on grayscale (E10)"),
+                       ("resnet50_color_strong_p70_224", "ResNet-50, p=0.7 (E8)")]:
+        d = read(out_dir / f"{tag}_history.json")
         if not d:
             continue
-        pv = acc(d, "test_metrics", "accuracy")
+        pv = d.get("test_metrics", {}).get("accuracy")
         col = f"{pv * 100:.2f}" if pv else "-"
-        seg_col = col if "segmented" in tag else "-"
-        pv_col = "-" if "segmented" in tag else col
-        rows.append([label, pv_col, seg_col, f"{d.get('plantdoc_accuracy', float('nan')):.2f}"])
+        variant = d.get("variant", "color")
+        rows.append([label,
+                     "-" if variant != "color" else col,
+                     col if variant == "segmented" else "-",
+                     f"{d['plantdoc_accuracy']:.2f}" if d.get("plantdoc_accuracy") else "-"])
 
-    for tag, label in [("ft_robust", "Fine-tuned 20-shot (from robust)"),
-                       ("ft_baseline", "Fine-tuned 20-shot (from baseline)")]:
-        d = load(out_dir / f"{tag}_history.json")
+    for tag, label in [("ft_robust", "Fine-tuned 20-shot from robust (E11)"),
+                       ("ft_baseline", "Fine-tuned 20-shot from baseline (E11)")]:
+        d = read(out_dir / f"{tag}_history.json")
         if d:
-            rows.append([label, "-", "-", f"{d['best']:.2f}  (from {d['before']:.2f})"])
+            rows.append([label, "-", "-", f"{d['best']:.2f} (from {d['before']:.2f})"])
 
-    header = ["Setting", "PlantVillage colour", "PlantVillage segmented", "PlantDoc field"]
+    header = ["Setting", "PlantVillage", "Segmented", "PlantDoc field"]
     widths = [max(len(r[i]) for r in [header] + rows) for i in range(4)]
     lines = ["| " + " | ".join(h.ljust(widths[i]) for i, h in enumerate(header)) + " |",
              "|" + "|".join("-" * (w + 2) for w in widths) + "|"]
     lines += ["| " + " | ".join(r[i].ljust(widths[i]) for i in range(4)) + " |" for r in rows]
 
-    probe = load(out_dir / "bias_probe.json")
     extra = []
+    probe = read(out_dir / "bias_probe.json")
     if probe:
-        extra.append(f"Background-pixel probe: {probe['test_accuracy'] * 100:.1f}% "
-                     f"(chance {100 / 38:.1f}%)")
-    if pdf:
-        extra.append(f"Zero-shot on all PlantDoc (n={pdf.get('n_images', '?')}): "
-                     f"ensemble {pdf['ensemble']:.2f}%")
-    probe_sev = load(out_dir / "severity_probe.json")
-    if probe_sev:
-        extra.append(f"Severity ratio separates healthy/diseased: AUC "
-                     f"{probe_sev['auc_official_mask']:.3f} (official mask), "
-                     f"{probe_sev['auc_otsu_mask']:.3f} (Otsu)")
-    cam = load(out_dir / "gradcam_audit.json")
+        extra.append(f"E3 background-pixel probe: {probe['test_accuracy'] * 100:.1f}% "
+                     f"(chance {probe['chance'] * 100:.1f}%)")
+    cam = read(out_dir / "gradcam_audit.json")
     if cam:
-        extra.append(f"Grad-CAM mass inside leaf: {cam['mean_attention_in_leaf'] * 100:.1f}% "
-                     f"vs {cam['mean_leaf_area_fraction'] * 100:.1f}% leaf area "
+        extra.append(f"E5 Grad-CAM inside leaf: {cam['mean_attention_in_leaf'] * 100:.1f}% "
+                     f"vs {cam['mean_leaf_area_fraction'] * 100:.1f}% area "
                      f"({cam['attention_lift_over_area'] * 100:+.1f} pts)")
-    sev = load(out_dir / "severity_validation.json")
+    full = read(out_dir / "eval_plantdoc_full.json")
+    if full:
+        extra.append(f"E6 zero-shot on all PlantDoc (n={full['n_images']}): "
+                     f"ensemble {full['ensemble']:.2f}%")
+    sev = read(out_dir / "severity_probe.json")
     if sev:
-        extra.append(f"Severity vs manual grades: rho={sev['spearman_rho']:.3f}, "
-                     f"kappa={sev['quadratic_kappa']:.3f}")
+        extra.append(f"E13 severity AUC: {sev['auc_official_mask']:.3f} official mask, "
+                     f"{sev['auc_otsu_mask']:.3f} Otsu")
+    val = read(out_dir / "severity_validation.json")
+    if val:
+        extra.append(f"E14 severity vs manual: rho={val['spearman_rho']:.3f}, "
+                     f"kappa={val['quadratic_kappa']:.3f}")
 
     text = "\n".join(lines) + ("\n\n" + "\n".join(extra) if extra else "") + "\n"
     (out_dir / "results_summary.md").write_text(text, encoding="utf-8")
@@ -177,12 +132,11 @@ def summarise(out_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run the full experiment pipeline.")
+    parser = argparse.ArgumentParser(description="Run the declared experiment matrix.")
     parser.add_argument("--config", default="configs/default.yaml")
-    parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--ft-epochs", type=int, default=15)
-    parser.add_argument("--quick", action="store_true", help="2-epoch smoke test, core stages only")
-    parser.add_argument("--full-ablation", action="store_true", help="also run p=1.0 and ResNet-50")
+    parser.add_argument("--experiments", default="configs/experiments.yaml")
+    parser.add_argument("--quick", action="store_true")
+    parser.add_argument("--optional", action="store_true")
     parser.add_argument("--only", nargs="+", default=None)
     parser.add_argument("--skip", nargs="+", default=[])
     parser.add_argument("--force", action="store_true")
@@ -190,50 +144,50 @@ def main():
     parser.add_argument("--stop-on-error", action="store_true")
     args = parser.parse_args()
 
+    defaults, stages = load_plan(args.experiments, args.optional and not args.quick)
     config_path = args.config
-    if args.quick:
-        args.epochs, args.ft_epochs = 2, 2
     out_dir = Path(Config.load(args.config).output_dir)
     if args.quick:
-        # a smoke test must not occupy the real result filenames
+        defaults = {**defaults, "epochs": 2, "ft_epochs": 2}
         out_dir = Path("outputs_quick")
         out_dir.mkdir(parents=True, exist_ok=True)
         raw = yaml.safe_load(Path(args.config).read_text(encoding="utf-8")) or {}
         raw["output_dir"] = out_dir.as_posix()
         config_path = (out_dir / "config_quick.yaml").as_posix()
         Path(config_path).write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
-        print(f"[quick]   isolated run -> {out_dir}/ (config {config_path})")
+        print(f"[quick]   isolated run -> {out_dir}/")
     out_dir.mkdir(parents=True, exist_ok=True)
-    plan = stages(args.epochs, args.ft_epochs, args.full_ablation and not args.quick)
-    plan = retarget(plan, out_dir.as_posix(), config_path)
+    stages = retarget(stages, out_dir.as_posix(), config_path)
 
-    produced_earlier = set()
-    results, started = [], time.time()
-    for name, produces, requires, argv in plan:
-        produced_earlier.add(produces)
+    produced, results, started = set(), [], time.time()
+    for stage in stages:
+        name, produces = stage["id"], stage["produces"]
+        produced.add(produces)
         if produces.endswith("_history.json"):
-            produced_earlier.add(produces.replace("_history.json", "_best.pth"))
+            produced.add(produces.replace("_history.json", "_best.pth"))
         if args.only and name not in args.only:
             continue
         if name in args.skip:
-            print(f"[skip]    {name} (requested)")
+            print(f"[skip]    {name}")
             continue
         if Path(produces).exists() and not args.force:
-            print(f"[done]    {name} -> {produces} already exists")
+            print(f"[done]    {name} -> {produces}")
             results.append((name, "cached", 0))
             continue
-        missing = [r for r in requires
-                   if not Path(r).exists() and not (args.dry_run and r in produced_earlier)]
+        missing = [r for r in stage.get("requires", [])
+                   if not Path(r).exists() and not (args.dry_run and r in produced)]
         if missing:
             print(f"[blocked] {name}: missing {missing[0]}")
             results.append((name, "blocked", 0))
             continue
+        argv = expand(stage["run"], defaults)
         cmd = [sys.executable, "-m", f"scripts.{argv[0]}", *argv[1:]]
-        print(f"\n[run]     {name}\n          {' '.join(cmd[2:])}", flush=True)
-        t0 = time.time()
+        print(f"\n[run]     {name}  ({stage.get('experiment', '-')})\n          {' '.join(cmd[2:])}",
+              flush=True)
         if args.dry_run:
             results.append((name, "dry-run", 0))
             continue
+        t0 = time.time()
         code = subprocess.run(cmd).returncode
         dt = time.time() - t0
         results.append((name, "ok" if code == 0 else f"FAILED({code})", dt))
@@ -241,16 +195,15 @@ def main():
         if code != 0 and args.stop_on_error:
             break
 
-    print("\n" + "=" * 60 + "\nPIPELINE SUMMARY")
+    print("\n" + "=" * 62 + "\nPIPELINE SUMMARY")
     for name, status, dt in results:
-        print(f"  {name:20s} {status:12s} {dt / 60:6.1f} min")
+        print(f"  {name:22s} {status:12s} {dt / 60:6.1f} min")
     print(f"  total {(time.time() - started) / 60:.1f} min")
     if not args.dry_run:
         print("\n" + summarise(out_dir))
-        print(f"written to {(out_dir / 'results_summary.md').as_posix()}")
         if not (out_dir / "severity_validation.json").exists():
-            print("\nNext: grade `manual_grade` (0-3) in outputs/severity_annotations.csv, then run\n"
-                  "  python -m scripts.severity_validate --csv outputs/severity_annotations.csv")
+            print("Next: grade manual_grade (0-3) in outputs/severity_annotations.csv, then\n"
+                  "  python -m scripts.audit --probe severity-validate")
 
 
 if __name__ == "__main__":

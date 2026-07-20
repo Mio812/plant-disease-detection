@@ -24,23 +24,3 @@ def border_features(path, size=32, positions=BORDER_POSITIONS):
     image.draft("RGB", (size, size))
     pixels = image.convert("RGB").resize((size, size)).load()
     return [channel for xy in positions for channel in pixels[xy]]
-
-
-def name_key(filename):
-    """Key that matches a colour file to its segmented twin.
-
-    Colour and segmented filenames disagree: some classes carry a UUID prefix
-    only in one variant, and segmented files end in ``_final_masked``.
-    """
-    stem = os.path.splitext(filename)[0]
-    if "___" in stem:
-        stem = stem.split("___", 1)[1]
-    if stem.endswith("_final_masked"):
-        stem = stem[: -len("_final_masked")]
-    return stem
-
-
-def segmented_index(segmented_root, class_name):
-    """Map ``name_key`` -> path for one class of the segmented variant."""
-    class_dir = os.path.join(segmented_root, class_name)
-    return {name_key(f): os.path.join(class_dir, f) for f in os.listdir(class_dir)}

@@ -13,10 +13,10 @@ from pathlib import Path
 
 from src.config import Config
 from src.data import get_dataloaders
-from src.ensemble import combine, member_probs, tune_weights
-from src.metrics import compute_metrics, confusion, full_report
+from src.models import combine, member_probs, tune_weights
+from src.evaluation import compute_metrics, confusion, full_report
 from src.utils import get_device, set_seed
-from src.visualize import plot_confusion_matrix
+from src.evaluation import plot_confusion_matrix
 
 MEMBERS = ["custom_cnn", "resnet18", "mobilenet_v2"]
 

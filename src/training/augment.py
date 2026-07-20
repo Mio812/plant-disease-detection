@@ -14,8 +14,8 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
-from .bias import name_key
-from .data import IMAGENET_MEAN, IMAGENET_STD
+from ..data.variants import name_key, variant_index
+from ..data.plantvillage import IMAGENET_MEAN, IMAGENET_STD
 
 
 def random_background(size, rng):
@@ -72,9 +72,7 @@ class BackgroundRandomised(Dataset):
 
     def _segmented(self, colour_path, class_name):
         if class_name not in self._index:
-            class_dir = os.path.join(self.segmented_root, class_name)
-            self._index[class_name] = {name_key(f): os.path.join(class_dir, f)
-                                       for f in os.listdir(class_dir)}
+            self._index[class_name] = variant_index(self.segmented_root, class_name)
         return self._index[class_name].get(name_key(os.path.basename(colour_path)))
 
     def __len__(self):
