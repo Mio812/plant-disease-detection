@@ -9,7 +9,7 @@ venv/
 env/
 
 # Data and artifacts
-data/
+/data/
 outputs/*
 !outputs/.gitkeep
 outputs_leaky/
