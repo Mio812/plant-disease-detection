@@ -294,12 +294,13 @@ official leaf mask is **61.3%**, against a **47.5%** leaf-area baseline — a li
 of only +13.8 points, so well over a third of the evidence is background.
 
 **Severity.** Two checks, neither needing manual labels. The HSV leaf segmentation
-scored against the official masks gives Dice **0.79** mean / **0.88** median over
-300 images (9.3% below 0.5). The lesion ratio separates healthy from diseased
-leaves with **ROC-AUC 0.888** using the official masks versus **0.774** with Otsu
+scored against the official masks gives Dice **0.80** mean / **0.87** median over
+300 images (9.0% below 0.5). The lesion ratio separates healthy from diseased
+leaves with **ROC-AUC 0.868** using the official masks versus **0.767** with Otsu
 segmentation, which is why the official masks are preferred; mean lesion ratio is
-0.035 on healthy leaves and 0.227 on diseased ones. `scripts.annotate` and `--probe severity-validate` additionally score the
-ordinal grade against manual annotations (Spearman, MAE, quadratic κ).
+0.039 on healthy leaves and 0.219 on diseased ones. `scripts.annotate` and
+`--probe severity-validate` additionally score the ordinal grade against manual
+annotations (Spearman, MAE, quadratic κ).
 
 **Task 1 as the brief words it.** For "healthy vs diseased", the ensemble reaches
 **100.00%** on the held-out test split — none of its errors cross the
