@@ -41,6 +41,7 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H12 | Task 1 is healthy-vs-diseased, which does not require species identification — the very thing H7 shows is the field bottleneck. Training the binary objective directly should therefore transfer better than collapsing a 38-way model's predictions. | open |
 | H13 | The Otsu-versus-official-mask AUC gap is segmentation error, not a ceiling on the lesion-ratio feature, so a better unsupervised mask recovers part of it. | open |
 | H14 | Background randomisation buys little zero-shot, but leaves features that *adapt* better, so its advantage grows under supervised adaptation rather than disappearing. | open |
+| H15 | E15 shows the frozen ImageNet backbone already does all the field-transferable work, so field accuracy should track **backbone quality and pretraining diversity** rather than anything done on PlantVillage. A stronger frozen CNN should therefore move the field number where six PlantVillage-side interventions could not. | open |
 
 ### The clearest single result: 574x the parameters, no field gain
 
@@ -144,6 +145,7 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E21 | Field accuracy stratified by luminance, contrast and sharpness | H11 | standard-augmentation baseline is the control; Wilson interval per bin | open |
 | E22 | Two-way healthy/diseased head, trained directly | H12 | matched to E8 `p = 0.7` in every respect but the output space; control is binary collapsed from the same arm's 38-way predictions | open |
 | E23 | Alternative unsupervised leaf mask | H13 | current `_leaf_mask` heuristic is the control, scored by Dice *and* by the severity AUC it produces | open |
+| E24 | Frozen-backbone ladder: ResNet-18 → ResNet-50 (V1) → ResNet-50 (V2) → ConvNeXt-T → RegNet-Y-16GF (SWAG) | H15 | each rung moves **one** factor — capacity, then training recipe, then architecture generation, then pretraining data. ResNet-18 under the same cached-feature protocol is the control | open |
 
 ## 4. What would falsify the conclusions
 
@@ -166,6 +168,11 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If every arm degrades at the same rate across the capture-quality bins (E21),
   H11 is rejected. 073-2 is then reported as *evaluated under* natural variation
   rather than *robust to* it, in the same way E7 and E8 are reported.
+- If field accuracy is flat along the whole E24 ladder — including the jump from
+  ImageNet to SWAG's 3.6B web images — H15 is rejected, and the ceiling is the
+  domain gap itself rather than feature quality. That would be the seventh
+  intervention to fail from the PlantVillage side, and it would settle the
+  argument that only target-domain data closes the gap.
 
 ## 5. Mapping to the brief and the rubric
 
