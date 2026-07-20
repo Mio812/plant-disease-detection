@@ -6,6 +6,7 @@ each PlantDoc test class to its PlantVillage equivalent so that a model trained
 on PlantVillage can be scored zero-shot.
 """
 
+import math
 import os
 
 PLANTDOC_TO_PLANTVILLAGE = {
@@ -50,3 +51,14 @@ def plantdoc_items(root, class_to_idx):
         folder_path = os.path.join(root, folder)
         items.extend((os.path.join(folder_path, f), label) for f in sorted(os.listdir(folder_path)))
     return items
+
+
+def wilson_interval(correct, total, z=1.96):
+    """95% Wilson confidence interval for an accuracy - small test sets need it."""
+    if total == 0:
+        return 0.0, 0.0
+    p = correct / total
+    denom = 1 + z * z / total
+    centre = (p + z * z / (2 * total)) / denom
+    half = z * math.sqrt(p * (1 - p) / total + z * z / (4 * total * total)) / denom
+    return max(0.0, centre - half), min(1.0, centre + half)
