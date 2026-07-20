@@ -3,7 +3,12 @@
 from pathlib import Path
 
 from torch.utils.data import DataLoader, Dataset, Subset
+from PIL import ImageFile
 from torchvision import transforms
+
+# PlantDoc is web-scraped and contains a few incomplete JPEGs; without this a
+# single truncated file aborts a whole evaluation.
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from torchvision.datasets import ImageFolder
 
 from .splits import splits_from_config

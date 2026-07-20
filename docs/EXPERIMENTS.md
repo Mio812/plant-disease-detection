@@ -105,6 +105,9 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 2. A drop in PlantVillage accuracy when the shortcut is removed is expected and
    is *not* a regression — it is the price of generalisation.
 3. E11 never shares a row with zero-shot numbers.
-4. Known threats to validity: PlantDoc is web-scraped and carries label noise;
+4. PlantDoc is web-scraped: a small number of its JPEGs are truncated, and PIL is
+   configured to load them rather than abort. Roughly 4% of the repository's file
+   names are also invalid on NTFS and are excluded on Windows.
+5. Known threats to validity: PlantDoc carries label noise;
    its train/test splits are known to differ in content; our field evaluation is
    236 images (±5 points), so the full-dataset variant is also reported.
