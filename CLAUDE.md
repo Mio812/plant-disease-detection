@@ -1,17 +1,59 @@
 # COMP9444 25T1 — Project 090, Automatic Plant Disease Detection
 
-## What this project argues
+## The project in one page
 
-Not "we got 99.8% on PlantVillage". The argument is that **99.8% on PlantVillage is
-mostly capture bias**, and the project's job is to prove that with controls rather
-than assert it. Every headline number is paired with a field number; a lab number
-on its own is not a result.
+**The brief.** Project 090 asks for a CNN that (i) classifies leaf images as healthy
+or diseased and (ii) estimates disease severity from image features, so as to *"aid
+farmers and agricultural experts in timely intervention"*. Deliverables are a
+codebase, a Jupyter notebook with visible outputs, a summary report (.docx) and a
+presentation that must fill the **UNSW-provided template** as-is. Team of four.
 
-Read `docs/EXPERIMENTS.md` before changing anything — it states the hypotheses
-(H1–H9), the experiment matrix (E1–E18), and the conditions under which each
-conclusion would be **falsified**. Those falsification conditions were written
-before the results came in and must not be quietly edited afterwards. H8 already
-failed its prediction and is recorded as "partly rejected"; keep that honesty.
+**The twist that makes it a real project.** The stated purpose is a *deployment*
+claim. PlantVillage — the dataset the brief points at — is 54,305 photographs of
+single detached leaves, laid flat on uniform backgrounds under studio lighting.
+Any modern CNN scores above 99% on it. That number does not answer the brief's own
+question, so the work splits into three:
+
+- **RQ1** — Can a CNN classify PlantVillage leaves accurately? *(brief, Task 1)*
+- **RQ2** — Does that accuracy mean it would work for the farmer the brief
+  describes, i.e. on real field photographs?
+- **RQ3** — Can severity be estimated from image features, and is it trustworthy?
+  *(brief, Task 2)*
+
+RQ2 is not scope creep; it tests whether the brief's stated aim is met.
+
+**Data.**
+
+| | Images | Classes | Role |
+|---|---|---|---|
+| PlantVillage `color` | 54,305 | 38 (14 crops) | train / val / test, seed 42, 70-15-15 |
+| PlantVillage `grayscale` | 54,305 | 38 | colour-cue ablation (E10) |
+| PlantVillage `segmented` | 54,305 | 38 | leaf masks for E4/E9, background randomisation, severity, Grad-CAM |
+| PlantDoc | 2,525 usable | 27 mapped | **never trained on** — external field validation |
+
+The three PlantVillage variants are the same leaves, so the split is index-identical
+across them. PlantDoc is web-scraped in-the-wild photography: whole plants, varying
+scale, overlapping foliage, real backgrounds.
+
+**Models.** Three baselines — a from-scratch CustomCNN, ResNet-18 and MobileNet-V2 —
+plus a soft-voting **ensemble** whose weights are grid-searched on validation and
+never see test. Later arms add background randomisation, a frozen-backbone probe,
+and a factorised crop-then-disease head.
+
+**What the project actually argues.** Not "we got 99.8%". The argument is that
+**99.8% on PlantVillage is mostly capture bias**, demonstrated with controls rather
+than asserted, and that the honest deployment story is a domain-adaptation one.
+Four independent probes agree, and the strongest is a direct control: training only
+19,494 parameters (0.17% of the network) reaches 91.70% in the lab and the *same*
+24.15% in the field as training all 11.2M. The 7.8 lab points that full fine-tuning
+buys are worth nothing outside the benchmark.
+
+Read `docs/EXPERIMENTS.md` before changing anything — it fixes the hypotheses
+(H1–H9), the experiment matrix (E1–E18) and the conditions under which each
+conclusion would be **falsified**, all written before the results arrived. Do not
+quietly edit a falsification condition afterwards. H8 already failed its prediction
+and is recorded as "partly rejected"; keep that honesty. Every headline number is
+paired with a field number; a lab number alone is not a result.
 
 ## Layout
 
