@@ -34,6 +34,26 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **open — needs training** |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 
+### Why we build our own split
+
+The PlantVillage repository ships `data_distribution_for_SVM/`, a train/test
+directory pair that is easy to mistake for a canonical split. It is not: it holds
+19,300 images (35% of the corpus) in 38 numerically-named classes, with **more
+test images than training images** (10,547 vs 8,751). That layout suits the SVM
+feature-extraction baseline it was built for, not CNN training.
+
+We therefore use all 54,305 colour images under one seeded 70/15/15 split
+(`src/data/splits.py`), shared by every model, every dataset variant and every
+audit, and never re-derived anywhere else in the codebase.
+
+### Which dataset variants are used
+
+| Variant | Used by |
+|---------|---------|
+| `color` | all training and evaluation unless stated otherwise |
+| `grayscale` | E10, the colour-cue ablation |
+| `segmented` | E4 and E9 directly; also supplies the leaf masks for background randomisation (E8), the severity estimator (E12/E13) and the Grad-CAM leaf-attention metric (E5) |
+
 ## 3. Experiment matrix
 
 Every PlantVillage number uses one fixed split (seed 42, 70/15/15, identical
