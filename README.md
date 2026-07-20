@@ -242,4 +242,85 @@ those confuse Corn Cercospora/Gray leaf spot with Northern Leaf Blight (a known
 visual look-alike), and no error crosses the healthy/diseased boundary. Averaging the
 three baselines by a validation-tuned weighted vote lifts test accuracy to **99.84%** and cuts errors to
 **13 / 8,145** — the best result, again with no healthy/diseased crossing; ResNet-18
-(99.68%) remains the strongest 
+(99.68%) remains the strongest  single model. Per-model training history, classification
+report, and confusion matrix are in `outputs/`.
+
+Each non-default row is reproduced with (same config, model overridden):
+
+```powershell
+uv run python -m scripts.train --model custom_cnn
+uv run python -m scripts.train --model mobilenet_v2
+```
+
+## Reality check: is 99.8% real?
+
+High PlantVillage accuracy is largely an artefact of the benchmark rather than
+evidence of disease understanding. Four experiments quantify this.
+
+**1. The background alone predicts the label.** A logistic regression trained on
+**8 border pixels** — no leaf at all — reaches **31.5%** accuracy over 38 classes
+(chance = 2.6%). The dataset carries capture bias correlated with the labels.
+
+**2. Removing the background collapses accuracy.** Re-scoring the same models on
+the same leaves using PlantVillage's `segmented` variant:
+
+| Model         | Original | Background removed | Change |
+| ------------- | -------- | ------------------ | ------ |
+| custom_cnn    | 99.15%   | 33.90%             | −65.3  |
+| resnet18      | 99.68%   | 56.75%             | −42.9  |
+| mobilenet_v2  | 98.98%   | 63.95%             | −35.0  |
+| **ensemble**  | 99.84%   | **57.60%**         | −42.2  |
+
+The from-scratch CNN degrades most and the ImageNet-pretrained backbones least,
+suggesting pretrained features attend more to the leaf and less to the backdrop.
+
+**3. On real field photographs the models fail.** Zero-shot evaluation on the
+[PlantDoc](https://github.com/pratikkayal/PlantDoc-Dataset) test split (236
+in-the-wild images, 27 classes mapped to PlantVillage):
+
+| Model         | PlantVillage | PlantDoc (field) | Change |
+| ------------- | ------------ | ---------------- | ------ |
+| custom_cnn    | 99.15%       | 13.14%           | −86.0  |
+| resnet18      | 99.68%       | 16.10%           | −83.6  |
+| **ensemble**  | 99.84%       | **17.37%**       | −82.5  |
+
+Coarse signal survives — healthy-vs-diseased binary accuracy is still 80.9% —
+but fine-grained disease identification does not transfer. Test-time fixes do
+not rescue it: hflip TTA adds +0.4 points and AdaBN *costs* 2.1, so the failure
+is a learned shortcut rather than a statistics shift.
+
+**4. The model only partly looks at the leaf.** Grad-CAM mass falling inside the
+official leaf mask is **61.3%**, against a **47.5%** leaf-area baseline — a lift
+of only +13.8 points, so well over a third of the evidence is background.
+
+**Severity.** Two checks, neither needing manual labels. The HSV leaf segmentation
+scored against the official masks gives Dice **0.79** mean / **0.88** median over
+300 images (9.3% below 0.5). The lesion ratio separates healthy from diseased
+leaves with **ROC-AUC 0.888** using the official masks versus **0.774** with Otsu
+segmentation, which is why the official masks are preferred; mean lesion ratio is
+0.035 on healthy leaves and 0.227 on diseased ones. `severity_sample.py` /
+`severity_validate.py` additionally score the ordinal grade against manual
+annotations (Spearman, MAE, quadratic κ).
+
+**Task 1 as the brief words it.** For "healthy vs diseased", the ensemble and
+ResNet-18 both reach **100.00%** on the held-out test split — none of their
+errors cross the healthy/diseased boundary.
+
+## References
+
+1. Hughes, D. P., & Salathé, M. (2015). *An open access repository of images on
+   plant health.* arXiv:1511.08060.
+2. Mohanty, S. P., Hughes, D. P., & Salathé, M. (2016). *Using deep learning for
+   image-based plant disease detection.* Frontiers in Plant Science, 7, 1419.
+3. Ferentinos, K. P. (2018). *Deep learning models for plant disease detection and
+   diagnosis.* Computers and Electronics in Agriculture, 145, 311–318.
+4. Arsenovic, M., et al. (2019). *Solving current limitations of deep learning based
+   approaches for plant disease detection.* Symmetry, 11(7), 939.
+5. Singh, D., Jain, N., Jain, P., Kayal, P., Kumawat, S., & Batra, N. (2020).
+   *PlantDoc: A dataset for visual plant disease detection.* In Proc. 7th ACM IKDD
+   CoDS and 25th COMAD, 249–253.
+6. Noyan, M. A. (2022). *Uncovering bias in the PlantVillage dataset.*
+   arXiv:2206.04374.
+7. Natarajan, S., Chakrabarti, P., & Margala, M. (2024). *Robust diagnosis and meta
+   visualizations of plant diseases through deep neural architecture with
+   explainable AI.* Scientific Reports, 14, 13695.
