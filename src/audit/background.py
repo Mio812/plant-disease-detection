@@ -1,14 +1,7 @@
-"""Dataset-bias diagnostics for PlantVillage.
+"""Background-bias probe: features taken only from the image border.
 
-Two probes quantify how much of the headline accuracy comes from capture bias
-rather than leaf pathology:
-
-* ``border_features`` — samples a handful of background pixels from the image
-  border. A classifier trained on these alone should be near chance (1/38) if
-  the background carries no label information.
-* ``segmented_path``  — maps a colour image to its background-removed twin in
-  the ``segmented`` variant, so trained models can be re-scored without the
-  background.
+A classifier trained on these should score near chance (1/38) unless the
+background carries label information.
 """
 
 
@@ -16,7 +9,7 @@ BORDER_POSITIONS = [(0, 0), (16, 0), (31, 0), (0, 16), (31, 16), (0, 31), (16, 3
 
 
 def border_features(path, size=32, positions=BORDER_POSITIONS):
-    """Return the RGB values of ``positions`` on a ``size``x``size`` thumbnail."""
+    """RGB values at ``positions`` on a size x size thumbnail."""
     from PIL import Image
 
     image = Image.open(path)

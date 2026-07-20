@@ -1,13 +1,11 @@
 """Run the experiment matrix declared in configs/experiments.yaml.
 
-Stages are resumable: one whose `produces` file already exists is skipped, so an
-interrupted run is continued by re-issuing the same command. Stage ids and their
-`experiment` fields map onto docs/EXPERIMENTS.md.
+A stage whose output file already exists is skipped, so an interrupted run
+resumes on re-invocation. Stage ids map onto docs/EXPERIMENTS.md.
 
 Usage:
     python -m scripts.run_all --dry-run
-    python -m scripts.run_all --quick            # 2 epochs, isolated outputs
-    python -m scripts.run_all --optional         # include the extra ablations
+    python -m scripts.run_all --quick
     python -m scripts.run_all --only train_bg_random
 """
 

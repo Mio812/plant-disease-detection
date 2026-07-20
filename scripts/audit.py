@@ -1,9 +1,10 @@
-"""Probes that test what the classifier is actually using, and whether the
-severity estimate means anything.
+"""Diagnostic probes for the classifier and the severity estimator.
 
     --probe background         predict the class from background pixels alone
-    --probe gradcam            how much explanation mass lands on the leaf
+    --probe gradcam            share of explanation mass landing on the leaf
     --probe severity           label-free severity validation (Dice + ROC-AUC)
+    --probe efficiency         parameters, checkpoint size, inference latency
+    --probe adaptation         test-time fixes (TTA, AdaBN) on field images
     --probe severity-sample    emit a CSV of leaves for manual grading
     --probe severity-validate  score the ordinal grade against manual grades
 

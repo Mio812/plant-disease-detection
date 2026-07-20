@@ -1,10 +1,8 @@
-"""Disease severity estimation from image features.
+"""Severity as the fraction of leaf area showing lesions.
 
-Severity is approximated as the fraction of leaf area showing lesion symptoms.
-The leaf is segmented from the background (by saturation, or from PlantVillage's
-official ``segmented`` mask when available) and lesions are the leaf pixels
-falling outside the healthy-green hue band. The ratio is bucketed into ordinal
-severity levels.
+The leaf is segmented by saturation (or from the official ``segmented`` mask),
+lesions are leaf pixels outside the healthy-green hue band, and the ratio is
+bucketed into ordinal levels.
 """
 
 import cv2

@@ -1,8 +1,4 @@
-"""One place to load a checkpoint and run inference.
-
-Every evaluation path -- PlantVillage, segmented, PlantDoc, Grad-CAM -- used to
-carry its own copy of this loop, which is how they drift apart.
-"""
+"""Checkpoint loading and inference, shared by every evaluation path."""
 
 import torch
 import torch.nn.functional as F
@@ -12,7 +8,7 @@ from ..utils import load_checkpoint
 
 
 def load_model(name, num_classes, checkpoint, device, pretrained=False):
-    """Build ``name`` and restore ``checkpoint`` in eval mode."""
+    """Build ``name`` and restore ``checkpoint``, in eval mode."""
     model = build_model(name, num_classes, pretrained=pretrained).to(device)
     model.load_state_dict(load_checkpoint(checkpoint, map_location=device)["model"])
     model.eval()
@@ -20,7 +16,7 @@ def load_model(name, num_classes, checkpoint, device, pretrained=False):
 
 
 def enable_batchnorm_adaptation(model):
-    """AdaBN: let BatchNorm use the target batch statistics instead of the stored ones."""
+    """AdaBN: BatchNorm uses target-batch statistics instead of the stored ones."""
     model.eval()
     for module in model.modules():
         if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
@@ -30,7 +26,7 @@ def enable_batchnorm_adaptation(model):
 
 @torch.no_grad()
 def predict_loader(model, loader, device, tta=False):
-    """Softmax probabilities over a DataLoader, with the labels it yielded."""
+    """Softmax probabilities and labels over a DataLoader."""
     probs, targets = [], []
     for images, labels in loader:
         images = images.to(device)
@@ -44,7 +40,7 @@ def predict_loader(model, loader, device, tta=False):
 
 @torch.no_grad()
 def predict_tensor(model, images, device, batch_size=64, tta=False):
-    """Softmax probabilities for an in-memory image batch."""
+    """Softmax probabilities for an in-memory batch."""
     out = []
     for i in range(0, len(images), batch_size):
         batch = images[i:i + batch_size].to(device)

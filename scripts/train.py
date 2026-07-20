@@ -1,14 +1,11 @@
 """Train one classifier.
 
-The same entry point covers the plain baselines and the de-shortcutting runs:
-
-    --variant color --augment standard              baseline (the original setup)
+    --variant color --augment standard              baseline
     --variant color --augment strong --p-random 0.7 background randomisation
     --variant segmented                             trained without background
     --variant grayscale                             colour-cue ablation
 
-PlantVillage and (when present) PlantDoc accuracy are both reported, because a
-laboratory number on its own is not a result.
+Reports PlantVillage and, when available, PlantDoc accuracy.
 
 Usage:
     python -m scripts.train --model resnet18

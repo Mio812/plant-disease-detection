@@ -1,8 +1,7 @@
-"""Robust training pipeline aimed at closing the laboratory-to-field gap.
+"""Strong augmentation and background randomisation.
 
-PlantVillage backgrounds are correlated with the labels, so a model can reach
-99% without looking at the leaf. Compositing each segmented leaf onto a random
-background destroys that shortcut and forces the network to use leaf features.
+PlantVillage backgrounds correlate with the labels, so leaves are composited
+onto random backgrounds to remove that shortcut.
 """
 
 import os
@@ -18,7 +17,7 @@ from ..data.plantvillage import IMAGENET_MEAN, IMAGENET_STD
 
 
 def random_background(size, rng):
-    """Generate a random background: solid, gradient, noise or blurred blobs."""
+    """Random background: solid, gradient, noise or blurred blobs."""
     w, h = size
     mode = rng.randint(0, 3)
     if mode == 0:
@@ -38,7 +37,7 @@ def random_background(size, rng):
 
 
 def build_strong_transforms(image_size):
-    """Heavier augmentation than the baseline: RandAugment, blur, erasing."""
+    """RandAugment, blur and erasing on top of the baseline transforms."""
     return transforms.Compose([
         transforms.RandomResizedCrop(image_size, scale=(0.5, 1.0)),
         transforms.RandomHorizontalFlip(),
@@ -54,11 +53,7 @@ def build_strong_transforms(image_size):
 
 
 class BackgroundRandomised(Dataset):
-    """PlantVillage training images with the background replaced at random.
-
-    ``p_random`` controls how often the background is swapped; the remainder are
-    left untouched so the model still sees the original distribution.
-    """
+    """Training images whose background is replaced with probability ``p_random``."""
 
     def __init__(self, samples, classes, segmented_root, image_size, p_random=0.7, seed=0):
         self.samples = samples

@@ -1,12 +1,10 @@
-"""Few-shot supervised adaptation to field images.
+"""Fine-tune a PlantVillage checkpoint on PlantDoc field images.
 
-Starts from a PlantVillage-trained checkpoint and fine-tunes on the PlantDoc
-train split, then reports accuracy on the PlantDoc test split. This is
-*supervised* domain adaptation and must be reported separately from the
+Supervised domain adaptation, so results are reported separately from the
 zero-shot numbers.
 
 Usage:
-    python -m scripts.finetune_plantdoc --model resnet18 \
+    python -m scripts.finetune --model resnet18 \
         --checkpoint outputs/resnet18_best.pth --shots 20 --epochs 15
 """
 

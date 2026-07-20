@@ -1,11 +1,9 @@
-"""Score trained checkpoints on any evaluation set.
+"""Score checkpoints on any evaluation set.
 
-    --on plantvillage   held-out PlantVillage test split (the laboratory number)
+    --on plantvillage   held-out PlantVillage test split
     --on segmented      the same leaves with the background removed
     --on grayscale      the same leaves without colour
-    --on plantdoc       in-the-wild field photographs (the generalisation number)
-
-All sets run through one inference path, so the numbers stay comparable.
+    --on plantdoc       in-the-wild field photographs
 
 Usage:
     python -m scripts.evaluate --on plantvillage --weights 0.2 0.5 0.3

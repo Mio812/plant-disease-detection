@@ -1,14 +1,9 @@
-"""Download the datasets.
+"""Download PlantVillage (training corpus) and PlantDoc (field images).
 
-PlantVillage is the training corpus (colour, grayscale and segmented variants);
-PlantDoc supplies the in-the-wild images for the generalisation study. Both are
-blob-filtered sparse clones, so only the needed subdirectories are fetched.
-
-Two wrinkles are handled here. PlantDoc keeps URL query strings in its file
-names, so some paths contain characters NTFS forbids -- git aborts the whole
-checkout on the first one, so those blobs are excluded on Windows. And a
-checkout can be interrupted, so completeness is judged by comparing the files on
-disk against the repository tree rather than by the directory merely existing.
+Both are blob-filtered sparse clones. Some PlantDoc file names keep URL query
+strings and contain characters NTFS forbids; those blobs are excluded on Windows,
+and completeness is checked against the repository tree so an interrupted
+checkout resumes.
 
 Usage:
     python -m scripts.prepare_data --dataset both

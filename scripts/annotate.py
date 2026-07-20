@@ -1,8 +1,9 @@
-"""Package the severity annotation task for a team, and merge the results back.
+"""Package the severity annotation task for a team and merge the results.
 
-`--action package` copies the sampled leaves into one self-contained folder per
-annotator, each with its own CSV, so teammates need neither the repository nor
-the dataset. `--action merge` reads the returned CSVs back into the master file.
+``package`` writes one self-contained folder per annotator (images, a CSV and a
+browser grader), so teammates need neither the repository nor the dataset.
+``merge`` reads the returned CSVs back into the master file, matching on image
+name rather than row order.
 
 Usage:
     python -m scripts.annotate --action package --annotators 4

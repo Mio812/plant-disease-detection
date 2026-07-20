@@ -1,9 +1,7 @@
-"""Cross-dataset evaluation on PlantDoc field images.
+"""PlantDoc field images, mapped onto PlantVillage classes.
 
-PlantDoc contains in-the-wild photographs (cluttered backgrounds, multiple
-leaves) whose class names differ from PlantVillage's. The mapping below sends
-each PlantDoc test class to its PlantVillage equivalent so that a model trained
-on PlantVillage can be scored zero-shot.
+PlantDoc uses its own class names, so the mapping below lets a PlantVillage
+model be scored zero-shot on in-the-wild photographs.
 """
 
 import math

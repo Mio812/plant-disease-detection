@@ -1,9 +1,6 @@
-"""Grad-CAM, and how much of the explanation lands on the leaf.
+"""Grad-CAM maps, and the share of CAM mass falling inside the leaf mask.
 
-The heat-map is the usual qualitative artefact; the useful number is the share
-of CAM mass inside the leaf mask compared with the leaf's share of image area.
-Attention no better than the area baseline means the model is not preferentially
-looking at the leaf.
+Compared against the leaf's share of image area as a baseline.
 """
 
 import torch
@@ -11,7 +8,7 @@ import torch.nn.functional as F
 
 
 def target_layer(model, name):
-    """Last convolutional stage for the supported backbones."""
+    """Last convolutional stage of a supported backbone."""
     if name.startswith("resnet"):
         return model.layer4
     if name in ("mobilenet_v2", "efficientnet_b0"):
@@ -22,7 +19,7 @@ def target_layer(model, name):
 
 
 def grad_cam(model, layer, images, device):
-    """Normalised Grad-CAM maps for the predicted class of each image."""
+    """Normalised Grad-CAM maps for each image's predicted class."""
     store = {}
     handles = [
         layer.register_forward_hook(lambda m, i, o: store.__setitem__("a", o)),
@@ -47,7 +44,7 @@ def grad_cam(model, layer, images, device):
 
 
 def leaf_attention(cam, leaf_mask):
-    """Share of CAM mass inside the leaf, and the leaf's share of the area."""
+    """(CAM mass inside the leaf, leaf share of image area)."""
     total = float(cam.sum())
     inside = float((cam * leaf_mask).sum()) / max(total, 1e-8)
     return inside, float(leaf_mask.mean())
