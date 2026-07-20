@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 import time
@@ -155,7 +156,11 @@ def main():
         raw["output_dir"] = out_dir.as_posix()
         config_path = (out_dir / "config_quick.yaml").as_posix()
         Path(config_path).write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
-        print(f"[quick]   isolated run -> {out_dir}/")
+        for member in ("custom_cnn", "resnet18", "mobilenet_v2"):
+            source = Path("outputs") / f"{member}_best.pth"
+            if source.exists() and not (out_dir / source.name).exists():
+                shutil.copy2(source, out_dir / source.name)
+        print(f"[quick]   isolated run -> {out_dir}/ (baseline checkpoints copied in)")
     out_dir.mkdir(parents=True, exist_ok=True)
     stages = retarget(stages, out_dir.as_posix(), config_path)
 
