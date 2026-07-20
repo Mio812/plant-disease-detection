@@ -62,7 +62,9 @@ def sparse_clone(url, dest, subdirs, force=False):
     on_disk = sum(1 for sub in subdirs for _ in (dest / sub).rglob("*.*")) if any(
         (dest / sub).exists() for sub in subdirs) else 0
 
+    sentinel = dest / ".complete"
     if on_disk >= len(wanted) and not force:
+        sentinel.write_text(str(on_disk), encoding="utf-8")
         print(f"  {dest.as_posix()}: complete ({on_disk} files), skipping checkout")
     else:
         if on_disk:
@@ -76,6 +78,13 @@ def sparse_clone(url, dest, subdirs, force=False):
             result = subprocess.run(["git", "sparse-checkout", "set", *subdirs], cwd=str(dest))
         if result.returncode != 0:
             print(f"  WARNING: checkout returned {result.returncode}; continuing with what arrived")
+        final = sum(1 for sub in subdirs for _ in (dest / sub).rglob("*.*"))
+        if final >= len(wanted):
+            sentinel.write_text(str(final), encoding="utf-8")
+            print(f"  {dest.as_posix()}: now complete ({final} files)")
+        else:
+            sentinel.unlink(missing_ok=True)
+            print(f"  {dest.as_posix()}: STILL INCOMPLETE ({final} of {len(wanted)}) - re-run to resume")
 
     for sub in subdirs:
         n = sum(1 for _ in (dest / sub).rglob("*.*")) if (dest / sub).exists() else 0

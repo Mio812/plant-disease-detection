@@ -14,7 +14,7 @@ defaults:
 stages:
   - id: prepare
     experiment: "-"
-    produces: data/PlantDoc/train
+    produces: data/PlantDoc/.complete
     run: [prepare_data, --dataset, both]
 
   - id: eval_lab
@@ -55,7 +55,7 @@ stages:
   - id: eval_field_full
     experiment: E6
     produces: outputs/eval_plantdoc_full.json
-    requires: [data/PlantDoc/train]
+    requires: [data/PlantDoc/.complete]
     run: [evaluate, --on, plantdoc, --plantdoc, data/PlantDoc/test, data/PlantDoc/train,
           --weights, "${weights}", --out, outputs/eval_plantdoc_full.json]
 
@@ -99,7 +99,7 @@ stages:
   - id: finetune_robust
     experiment: E11
     produces: outputs/ft_robust_history.json
-    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/train]
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
     run: [finetune, --model, resnet18, --image-size, "${image_size}",
           --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
           --shots, "20", --epochs, "${ft_epochs}", --tag, ft_robust]
@@ -107,7 +107,7 @@ stages:
   - id: finetune_baseline
     experiment: E11
     produces: outputs/ft_baseline_history.json
-    requires: [outputs/resnet18_best.pth, data/PlantDoc/train]
+    requires: [outputs/resnet18_best.pth, data/PlantDoc/.complete]
     run: [finetune, --model, resnet18, --checkpoint, outputs/resnet18_best.pth,
           --shots, "20", --epochs, "${ft_epochs}", --tag, ft_baseline]
 
@@ -120,7 +120,7 @@ stages:
   - id: finetune_full
     experiment: "E11 / 073-1 full-data adaptation"
     produces: outputs/ft_full_history.json
-    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/train]
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/.complete]
     run: [finetune, --model, resnet18, --image-size, "${image_size}",
           --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
           --shots, "0", --epochs, "${ft_epochs}", --tag, ft_full]
