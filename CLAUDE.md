@@ -48,6 +48,20 @@ Four independent probes agree, and the strongest is a direct control: training o
 24.15% in the field as training all 11.2M. The 7.8 lab points that full fine-tuning
 buys are worth nothing outside the benchmark.
 
+**Why PlantDoc is in a PlantVillage project.** Project 090 names PlantVillage and
+asks for classification plus severity. Its stated purpose — timely intervention by
+farmers — is a deployment claim, and PlantVillage cannot test one: it is studio
+photography of detached leaves. PlantDoc is field photography of whole plants, and
+it is the only ready-made instrument for that test. It therefore enters as **the
+instrument RQ2 requires**, not as a second project.
+
+PlantDoc happens to be the dataset of a separate brief (073), so the field work is
+held to that brief's requirements as well, and `docs/EXPERIMENTS.md` §5 records the
+mapping so coverage is traceable. Two rules follow. **Never describe this as having
+completed two projects** — it is one project that took its own brief's stated aim
+seriously. And both bullet points of 090's Task list stay first-class: healthy vs
+diseased, the specific disease, and severity.
+
 Read `docs/EXPERIMENTS.md` before changing anything — it fixes the hypotheses
 (H1–H9), the experiment matrix (E1–E18) and the conditions under which each
 conclusion would be **falsified**, all written before the results arrived. Do not
