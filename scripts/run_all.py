@@ -19,6 +19,8 @@ import sys
 import time
 from pathlib import Path
 
+import yaml
+
 from src.config import Config
 
 W = ["0.2", "0.5", "0.3"]          # validation-tuned ensemble weights
@@ -72,6 +74,18 @@ def stages(epochs, ft_epochs, full_ablation):
          ["severity_sample", "--n", "150"]),
     ]
     return plan
+
+
+def retarget(plan, out_dir, config_path):
+    """Point every path and every --config at the active output directory."""
+    fixed = []
+    for name, produces, requires, argv in plan:
+        swap = lambda s: s.replace("outputs/", f"{out_dir}/") if out_dir != "outputs" else s
+        if argv[0] != "download_plantdoc":
+            argv = [*argv, "--config", config_path]
+        fixed.append((name, swap(produces), [swap(r) for r in requires],
+                      [swap(a) for a in argv]))
+    return fixed
 
 
 def load(path):
@@ -158,11 +172,22 @@ def main():
     parser.add_argument("--stop-on-error", action="store_true")
     args = parser.parse_args()
 
+    config_path = args.config
     if args.quick:
         args.epochs, args.ft_epochs = 2, 2
     out_dir = Path(Config.load(args.config).output_dir)
+    if args.quick:
+        # a smoke test must not occupy the real result filenames
+        out_dir = Path("outputs_quick")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        raw = yaml.safe_load(Path(args.config).read_text(encoding="utf-8")) or {}
+        raw["output_dir"] = out_dir.as_posix()
+        config_path = (out_dir / "config_quick.yaml").as_posix()
+        Path(config_path).write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+        print(f"[quick]   isolated run -> {out_dir}/ (config {config_path})")
     out_dir.mkdir(parents=True, exist_ok=True)
     plan = stages(args.epochs, args.ft_epochs, args.full_ablation and not args.quick)
+    plan = retarget(plan, out_dir.as_posix(), config_path)
 
     produced_earlier = set()
     results, started = [], time.time()
