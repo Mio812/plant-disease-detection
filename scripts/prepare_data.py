@@ -1,8 +1,14 @@
 """Download the datasets.
 
 PlantVillage is the training corpus (colour, grayscale and segmented variants);
-PlantDoc supplies the in-the-wild images used for the generalisation study.
-Both are blob-filtered sparse clones, so only what is needed is fetched.
+PlantDoc supplies the in-the-wild images for the generalisation study. Both are
+blob-filtered sparse clones, so only the needed subdirectories are fetched.
+
+Two wrinkles are handled here. PlantDoc keeps URL query strings in its file
+names, so some paths contain characters NTFS forbids -- git aborts the whole
+checkout on the first one, so those blobs are excluded on Windows. And a
+checkout can be interrupted, so completeness is judged by comparing the files on
+disk against the repository tree rather than by the directory merely existing.
 
 Usage:
     python -m scripts.prepare_data --dataset both
@@ -15,69 +21,77 @@ from pathlib import Path
 
 PLANTVILLAGE = ("https://github.com/spMohanty/PlantVillage-Dataset.git", Path("data/PlantVillage"))
 PLANTDOC = ("https://github.com/pratikkayal/PlantDoc-Dataset.git", Path("data/PlantDoc"))
+WINDOWS_ILLEGAL = ':?*"<>|'
+MAX_PATH = 250
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Fetch PlantVillage and/or PlantDoc.")
     parser.add_argument("--dataset", choices=["plantvillage", "plantdoc", "both"], default="both")
-    parser.add_argument("--variants", nargs="+", default=["raw/color", "raw/grayscale", "raw/segmented"],
-                        help="PlantVillage subdirectories to check out (sparse-checkout is destructive: "
-                             "listing fewer variants removes the others from the work tree)")
+    parser.add_argument("--variants", nargs="+",
+                        default=["raw/color", "raw/grayscale", "raw/segmented"],
+                        help="PlantVillage subdirectories to check out")
     parser.add_argument("--plantdoc-splits", nargs="+", default=["test", "train"])
+    parser.add_argument("--force", action="store_true", help="re-run checkout even if complete")
     return parser.parse_args()
 
 
-WINDOWS_ILLEGAL = ':?*"<>|'
+def tree(dest):
+    return subprocess.run(["git", "ls-tree", "-r", "--name-only", "HEAD"],
+                          cwd=str(dest), capture_output=True, text=True).stdout.splitlines()
 
 
-def _windows_safe(dest, subdirs):
-    """PlantDoc keeps URL query strings in its file names, which NTFS rejects.
-
-    Git aborts the whole checkout on the first such path, so on Windows we list
-    the offending blobs and exclude them with a sparse-checkout pattern rather
-    than letting the stage fail.
-    """
-    listing = subprocess.run(["git", "ls-tree", "-r", "--name-only", "HEAD"],
-                             cwd=str(dest), capture_output=True, text=True).stdout.splitlines()
-    return [path for path in listing
-            if path.split("/")[0] in subdirs
-            and (any(c in WINDOWS_ILLEGAL for c in path.split("/")[-1])
-                 or len(str(dest.resolve())) + len(path) > 250)]
+def checkoutable(dest, paths):
+    """Paths git can actually write on this platform."""
+    if os.name != "nt":
+        return paths, []
+    root = len(str(dest.resolve())) + 1
+    unsafe = [p for p in paths
+              if any(c in WINDOWS_ILLEGAL for c in p.split("/")[-1]) or root + len(p) > MAX_PATH]
+    return [p for p in paths if p not in set(unsafe)], unsafe
 
 
-def sparse_clone(url, dest, subdirs):
+def sparse_clone(url, dest, subdirs, force=False):
     if not (dest / ".git").exists():
         dest.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
                         url, str(dest)], check=True)
-    present = [s for s in subdirs if (dest / s).exists()]
-    if len(present) == len(subdirs):
-        print(f"  {dest.as_posix()}: all requested variants already present, skipping sparse-checkout")
+
+    listing = [p for p in tree(dest) if p.split("/")[0] in subdirs]
+    wanted, unsafe = checkoutable(dest, listing)
+    on_disk = sum(1 for sub in subdirs for _ in (dest / sub).rglob("*.*")) if any(
+        (dest / sub).exists() for sub in subdirs) else 0
+
+    if on_disk >= len(wanted) and not force:
+        print(f"  {dest.as_posix()}: complete ({on_disk} files), skipping checkout")
     else:
-        patterns = list(subdirs)
-        unsafe = _windows_safe(dest, subdirs) if os.name == "nt" else []
+        if on_disk:
+            print(f"  {dest.as_posix()}: incomplete ({on_disk} of {len(wanted)}), resuming")
         if unsafe:
-            print(f"  skipping {len(unsafe)} files whose names are invalid on Windows")
-            patterns += [f"!/{path}" for path in unsafe]
-        result = subprocess.run(["git", "sparse-checkout", "set", "--no-cone", *patterns]
-                                if unsafe else ["git", "sparse-checkout", "set", *subdirs],
-                                cwd=str(dest))
+            print(f"  excluding {len(unsafe)} files whose names are invalid on this platform")
+            patterns = [f"/{sub}/" for sub in subdirs] + [f"!/{p}" for p in unsafe]
+            result = subprocess.run(["git", "sparse-checkout", "set", "--no-cone", *patterns],
+                                    cwd=str(dest))
+        else:
+            result = subprocess.run(["git", "sparse-checkout", "set", *subdirs], cwd=str(dest))
         if result.returncode != 0:
-            print(f"  WARNING: checkout of {dest.as_posix()} was incomplete; "
-                  f"continuing with whatever was fetched")
+            print(f"  WARNING: checkout returned {result.returncode}; continuing with what arrived")
+
     for sub in subdirs:
         n = sum(1 for _ in (dest / sub).rglob("*.*")) if (dest / sub).exists() else 0
-        print(f"  {dest.as_posix()}/{sub}: {n} files")
+        classes = len([d for d in (dest / sub).iterdir() if d.is_dir()]) if (dest / sub).exists() else 0
+        print(f"  {dest.as_posix()}/{sub}: {n} files"
+              + (f", {classes} classes" if classes else ""))
 
 
 def main():
     args = parse_args()
     if args.dataset in ("plantvillage", "both"):
         print("PlantVillage")
-        sparse_clone(*PLANTVILLAGE, args.variants)
+        sparse_clone(*PLANTVILLAGE, args.variants, args.force)
     if args.dataset in ("plantdoc", "both"):
         print("PlantDoc")
-        sparse_clone(*PLANTDOC, args.plantdoc_splits)
+        sparse_clone(*PLANTDOC, args.plantdoc_splits, args.force)
 
 
 if __name__ == "__main__":
