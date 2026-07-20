@@ -31,11 +31,11 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H2 | Much of that accuracy comes from capture bias in the background, not from leaf pathology. | confirmed |
 | H3 | Accuracy therefore collapses on real field photographs. | confirmed |
 | H4 | The collapse is a *learned shortcut*, not a test-time statistics shift, so test-time fixes will not repair it. | confirmed |
-| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **open — needs training** |
+| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | supported on the 2,525 basis (+1.63 pp, +2.89 on crop); significance awaits the pre-registered McNemar |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
-| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **partly rejected** — it ties, it does not win |
-| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | open |
+| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **supported** — the earlier "tie" was an underpowered n=236 reading; on 2,525 the frozen backbone wins by +1.67 (38-way), +4.13 (binary), +5.25 (crop) |
+| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **direction supported, magnitude rejected** — crop rose 36.99 → 38.73 (+1.74), nowhere near the ~60% that would have made it matter, and still below simply freezing the backbone (40.12) |
 | H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
 | H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | open |
 | H12 | Task 1 is healthy-vs-diseased, which does not require species identification — the very thing H7 shows is the field bottleneck. Training the binary objective directly should therefore transfer better than collapsing a 38-way model's predictions. | open |
@@ -44,46 +44,67 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H15 | E15 shows the frozen ImageNet backbone already does all the field-transferable work, so field accuracy should track **backbone quality and pretraining diversity** rather than anything done on PlantVillage. A stronger frozen CNN should therefore move the field number where six PlantVillage-side interventions could not. | open |
 | H16 | A severity head trained to regress the official-mask lesion ratio beats re-deriving that mask with Otsu at inference, because it learns the mask from image features instead of approximating it with a colour heuristic. | open |
 
-### The clearest single result: 574x the parameters, no field gain
+### The clearest single result: 574x the parameters, and the field gets worse
 
 E15 trains only the 19,494-parameter head and leaves all 11.2M backbone weights
-at their ImageNet values. The matched full fine-tune updates everything.
+at their ImageNet values. The matched full fine-tune updates everything. Scored
+on all 2,525 field images, as E16 specified before any of it ran:
 
-| Arm | Trainable | PlantVillage | PlantDoc |
-|---|---|---|---|
-| Full fine-tune, strong aug (E8 control) | 11,196,006 | 99.52% | 23.73% |
-| Frozen backbone, strong aug (E15 control) | 19,494 (0.17%) | 91.70% | 24.15% |
+| Arm | Trainable | PlantVillage | PlantDoc 38-way | crop |
+|---|---|---|---|---|
+| Full fine-tune, `p = 0.0` | 11,196,006 | 99.52% | 14.69% | 34.10% |
+| Full fine-tune, `p = 0.7` | 11,196,006 | 99.26% | 16.32% | 36.99% |
+| Frozen backbone, `p = 0.0` | 19,494 (0.17%) | 91.70% | **17.47%** | 40.12% |
+| Frozen backbone, `p = 0.7` | 19,494 (0.17%) | 89.12% | 16.87% | **41.47%** |
 
-Fine-tuning 574x more parameters buys 7.8 points on PlantVillage and nothing at
-all in the field. H8 predicted the frozen arm would *win*; it ties, so H8 is
-recorded as partly rejected. The tie is the stronger statement: it isolates those
-7.8 points as entirely benchmark-specific, using a direct control rather than the
-indirect evidence of E3 and E5. The two accuracies are decoupled.
+Freezing costs 8.98 points of PlantVillage accuracy and **gains** 1.67 in the
+field, 4.13 on healthy-vs-diseased and 5.25 on crop identification. Training
+574x more parameters is not merely worthless outside the benchmark — it is
+actively harmful, and the harm falls on species recognition, which H7 identifies
+as the binding constraint.
+
+An earlier reading of this experiment on the 236-image split showed a tie
+(24.15% vs 23.73%) and H8 was recorded as partly rejected on that basis. That
+reading was underpowered, not wrong in principle: the same-basis rule and E16's
+2,525-image scope were both fixed before these arms ran, and the effect appears
+as soon as the pre-specified basis is used. The status is corrected rather than
+the criterion.
+
+The 2x2 also separates mechanism from effect. Background randomisation helps the
+trainable backbone (+1.63) and *hurts* the frozen one (-0.60), which is what the
+shortcut account predicts: the intervention exists to stop a backbone acquiring
+PlantVillage's capture bias, and a frozen ImageNet backbone never had the
+opportunity to acquire it. ImageNet already separates plant species; fine-tuning
+on studio photographs, where species is readable off background and outline,
+degrades that ability.
 
 ### What the field accuracy is actually made of
 
-Reporting a single 24% hides the failure mode. Decomposing the best zero-shot arm
-(ResNet-18, strong augmentation, `p = 0.7`, 224px) on the 236-image PlantDoc test
-split:
+Reporting a single number hides the failure mode. Decomposing the best zero-shot
+arm — frozen backbone, `p = 0.0`, 224px — on **all 2,525** field images:
 
 | Level | Accuracy | Chance |
 |---|---|---|
-| All 38 classes | 24.15% | 2.6% |
-| Restricted to the 27 reachable classes | 27.54% | 3.7% |
-| Crop species only | 46.19% | 7.1% |
-| Disease, given the crop was right | 52.29% | ~33% |
-| Healthy vs diseased | 74.58% | 50% |
+| All 38 classes | 17.47% | 2.6% |
+| Restricted to the 27 reachable classes | 19.88% | 3.7% |
+| Crop species only | 40.12% | 7.1% |
+| Disease, given the crop was right | 43.53% | ~33% |
+| Healthy vs diseased | 73.94% | 50% |
 
-`0.4619 x 0.5229 = 0.2415`, so the two factors account for the whole number. Once
-the species is right the diagnosis is 1.6x chance, which is weak but real; the
-species itself is right less than half the time. The bottleneck is therefore
-recognising the plant, not recognising the disease.
+`0.4012 x 0.4353 = 0.1747`, so the two factors account for the whole number. Once
+the species is right the diagnosis runs at 1.3x chance, weak but real; the species
+itself is right under half the time. The bottleneck is recognising the plant, not
+recognising the disease — and every arm in E16 shows the same shape, so this is a
+property of the domain gap rather than of one model.
 
-Every figure in that table is on n = 236. `scripts/train.py` prints only the total
-for that split and never the decomposition, so no arm's crop accuracy can be read
-off a training log. E16 re-scores each 224 arm on all 2,525 field images, and
-cross-arm comparisons — E17 against E8 above all — are made on that basis alone.
-The two are never mixed.
+Basis matters more than expected here, which is why the rule exists. The same arms
+scored on the 236-image test split read 6 to 9 points higher and **reorder**: the
+224px arm beats the 128px ensemble by 6.4 points at n = 236 and merely ties it at
+n = 2,525. PlantDoc's train and test splits are documented as differing in content
+and this is what that looks like. `scripts/train.py` prints only the total for the
+236-image split and never the decomposition, so no arm's crop accuracy can be read
+off a training log; E16 is the only source, and cross-arm comparisons are made on
+the 2,525 basis alone.
 
 This is consistent with H2 rather than a separate finding. PlantVillage shows one
 detached leaf, centred, flat, filling the frame; PlantDoc shows whole plants at
