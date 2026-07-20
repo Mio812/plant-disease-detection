@@ -87,6 +87,12 @@ Its two tasks:
 
 **Core 090 analysis (exploratory + discussion, not bonus)**
 - [ ] leaf-leakage / test integrity — the split fix and its inflation number
+- [ ] residual-leakage check (post-rebuild): embed all images with a frozen
+      ImageNet backbone, calibrate a "same-leaf" cosine threshold on the pairs the
+      leaf-map already groups, then count test images with an out-of-group near
+      duplicate in train. Quantifies what the map missed among the 24% singletons.
+      Built and logic-verified in scratchpad (`near_dup_check.py`); GPU pass, run
+      once the rebuild frees the machine
 - [ ] E3 border-pixel probe, E5 Grad-CAM — what the classifier attends to
 - [ ] E10 grayscale colour ablation
 - [ ] class-distribution / imbalance characterization
