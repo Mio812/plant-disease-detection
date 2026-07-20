@@ -6,8 +6,8 @@ data:
   image_size: 128
   val_split: 0.15
   test_split: 0.15
-  batch_size: 64
-  num_workers: 4
+  batch_size: 96
+  num_workers: 10
 
 model:
   name: resnet18          # custom_cnn | resnet18 | mobilenet_v2
