@@ -59,9 +59,11 @@ plant-disease-detection/
 │   ├── download_data.py        # fetch PlantVillage into data/
 │   ├── download_plantdoc.py    # fetch the PlantDoc field-image test split
 │   ├── train.py                # train from a config
+│   ├── train_robust.py         # background randomisation / segmented training
 │   ├── evaluate.py             # evaluate a checkpoint on the test split
 │   ├── predict.py              # classify + estimate severity for one image
 │   ├── ensemble.py             # evaluate the soft-voting ensemble
+│   ├── run_all.py              # resumable driver for the whole pipeline
 │   ├── bias_probe.py           # predict the class from background pixels alone
 │   ├── eval_segmented.py       # re-score models with the background removed
 │   ├── eval_plantdoc.py        # zero-shot evaluation on field images
@@ -147,6 +149,11 @@ uv run python -m scripts.bias_probe          # class from background pixels only
 uv run python -m scripts.eval_segmented      # background removed
 uv run python -m scripts.download_plantdoc   # fetch field images (once)
 uv run python -m scripts.eval_plantdoc       # zero-shot on field images
+
+# 6b. Or run the whole generalisation pipeline in one resumable command
+uv run python -m scripts.run_all --dry-run   # show the plan
+uv run python -m scripts.run_all --quick     # 2-epoch smoke test (isolated in outputs_quick/)
+uv run python -m scripts.run_all             # full run; re-run to resume after an interruption
 
 # 7. Severity: sample for grading, then validate against manual grades
 uv run python -m scripts.severity_sample --n 150
