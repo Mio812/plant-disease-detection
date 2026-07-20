@@ -54,6 +54,7 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--image-size", type=int, default=None)
+    parser.add_argument("--tag", default=None, help="output name; defaults to the checkpoint stem")
     return parser.parse_args()
 
 
@@ -102,6 +103,8 @@ def main():
                 total += y.numel()
         return 100.0 * correct / total
 
+    tag = args.tag or f"{Path(args.checkpoint).stem}_ft{args.shots or 0}"
+
     before = field_accuracy()
     print(f"PlantDoc accuracy before fine-tuning: {before:.2f}%")
 
@@ -120,10 +123,10 @@ def main():
         if acc > best:
             best = acc
             torch.save({"model": model.state_dict(), "plantdoc_accuracy": acc},
-                       Path(cfg.output_dir) / f"{args.model}_plantdoc_ft.pth")
+                       Path(cfg.output_dir) / f"{tag}.pth")
 
     print(f"\nbest PlantDoc accuracy {best:.2f}%  (zero-shot start {before:.2f}%)")
-    out = Path(cfg.output_dir) / f"{args.model}_plantdoc_ft_history.json"
+    out = Path(cfg.output_dir) / f"{tag}_history.json"
     out.write_text(json.dumps({"shots": args.shots, "before": before, "best": best,
                                "history": history}, indent=2), encoding="utf-8")
 

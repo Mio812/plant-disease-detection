@@ -78,7 +78,7 @@ def main():
 
     out_dir = Path(cfg.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    tag = f"{args.model}_robust"
+    tag = f"{args.model}_robust_p{int(args.p_random * 100)}_{cfg.data.image_size}"
     history = fit(model, loaders, criterion, optimizer, scheduler, device,
                   cfg.train.epochs, cfg.train.early_stop_patience, out_dir / f"{tag}_best.pth")
 
