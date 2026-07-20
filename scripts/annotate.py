@@ -42,7 +42,7 @@ GRADER_HTML = """<!DOCTYPE html>
  <div id="bar"><div id="fill"></div></div>
  <div id="meta"></div>
 </header>
-<img id="pic" alt="leaf">
+<img id="pic" alt="(image failed to load)" onerror="document.getElementById('meta').textContent='Could not load '+IMAGES[i]+' - is the images folder next to this file?'">
 <div class="hint">
  How much of the <b>LEAF</b> shows disease symptoms? Ignore the background.<br>
  <b>0</b> none &nbsp;|&nbsp; <b>1</b> mild, under 5% &nbsp;|&nbsp; <b>2</b> moderate, 5&ndash;20% &nbsp;|&nbsp;
@@ -69,14 +69,14 @@ function show(){
   const done=Object.keys(g).length;
   document.getElementById("fill").style.width=(100*done/IMAGES.length)+"%";
   document.getElementById("meta").textContent=`${done} / ${IMAGES.length} graded  -  now showing #${i+1}: ${IMAGES[i]}`;
-  document.getElementById("pic").src="images/"+IMAGES[i];
+  document.getElementById("pic").src="images/"+encodeURIComponent(IMAGES[i]);
 }
 function grade(v){g[IMAGES[i]]=v;localStorage.setItem(KEY,JSON.stringify(g));i=firstUngraded();
   if(i>=IMAGES.length){finish();}else{show();}}
 function back(){i=Math.max(0,i-1);delete g[IMAGES[i]];localStorage.setItem(KEY,JSON.stringify(g));show();}
 function finish(){
-  let csv="image,manual_grade\n";
-  IMAGES.forEach(n=>{csv+=n+","+(n in g?g[n]:"")+"\n";});
+  let csv="image,manual_grade\\n";
+  IMAGES.forEach(n=>{csv+=n+","+(n in g?g[n]:"")+"\\n";});
   const t=document.getElementById("out");t.style.display="block";t.value=csv;t.select();
   document.getElementById("meta").textContent="Done. Copy the text below into grades.csv, or save it as grades.csv.";
 }
