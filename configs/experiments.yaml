@@ -111,6 +111,20 @@ stages:
     run: [finetune, --model, resnet18, --checkpoint, outputs/resnet18_best.pth,
           --shots, "20", --epochs, "${ft_epochs}", --tag, ft_baseline]
 
+  - id: efficiency
+    experiment: "073-3 deployment profile"
+    produces: outputs/efficiency_probe.json
+    requires: [outputs/resnet18_best.pth]
+    run: [audit, --probe, efficiency]
+
+  - id: finetune_full
+    experiment: "E11 / 073-1 full-data adaptation"
+    produces: outputs/ft_full_history.json
+    requires: [outputs/resnet18_color_strong_p70_224_best.pth, data/PlantDoc/train]
+    run: [finetune, --model, resnet18, --image-size, "${image_size}",
+          --checkpoint, outputs/resnet18_color_strong_p70_224_best.pth,
+          --shots, "0", --epochs, "${ft_epochs}", --tag, ft_full]
+
 optional:
   - id: train_bg_random_full
     experiment: E8

@@ -227,6 +227,43 @@ def probe_adaptation(cfg, args):
     return "adaptation_probe.json", summary
 
 
+def probe_efficiency(cfg, args):
+    """Deployment profile: size and latency, for the edge-deployment claim."""
+    import time
+
+    base = ImageFolder(cfg.data.root)
+    device = get_device()
+    size = args.image_size or cfg.data.image_size
+    rows = {}
+    for name in ["custom_cnn", "resnet18", "mobilenet_v2"]:
+        checkpoint = Path(cfg.output_dir) / f"{name}_best.pth"
+        model = load_model(name, len(base.classes), checkpoint, device)
+        params = sum(p.numel() for p in model.parameters())
+        x = torch.randn(1, 3, size, size, device=device)
+        with torch.no_grad():
+            for _ in range(5):
+                model(x)
+            if device == "cuda":
+                torch.cuda.synchronize()
+            t0 = time.perf_counter()
+            for _ in range(args.latency_runs):
+                model(x)
+            if device == "cuda":
+                torch.cuda.synchronize()
+            latency = (time.perf_counter() - t0) / args.latency_runs * 1000
+        rows[name] = {"parameters_M": round(params / 1e6, 2),
+                      "checkpoint_MB": round(checkpoint.stat().st_size / 1e6, 1),
+                      "latency_ms": round(latency, 2),
+                      "throughput_img_s": round(1000 / latency, 1)}
+        print(f"  {name:14s} {rows[name]['parameters_M']:6.2f}M params  "
+              f"{rows[name]['checkpoint_MB']:6.1f} MB  "
+              f"{rows[name]['latency_ms']:7.2f} ms/img  "
+              f"{rows[name]['throughput_img_s']:7.1f} img/s")
+    rows["device"] = str(device)
+    rows["image_size"] = size
+    return "efficiency_probe.json", rows
+
+
 def probe_severity_sample(cfg, args):
     base = ImageFolder(cfg.data.root)
     diseased = [i for i, (_, l) in enumerate(base.samples)
@@ -273,7 +310,7 @@ def probe_severity_validate(cfg, args):
 
 
 PROBES = {"background": probe_background, "gradcam": probe_gradcam, "severity": probe_severity,
-          "adaptation": probe_adaptation,
+          "adaptation": probe_adaptation, "efficiency": probe_efficiency,
           "severity-sample": probe_severity_sample, "severity-validate": probe_severity_validate}
 
 
@@ -289,6 +326,8 @@ def main():
     parser.add_argument("--csv", default="outputs/severity_annotations.csv")
     parser.add_argument("--plantdoc", default="data/PlantDoc/test")
     parser.add_argument("--weights", type=float, nargs="+", default=[0.2, 0.5, 0.3])
+    parser.add_argument("--image-size", type=int, default=None)
+    parser.add_argument("--latency-runs", type=int, default=50)
     parser.add_argument("--out", default=None,
                         help="override the output filename (use for smoke tests)")
     args = parser.parse_args()
