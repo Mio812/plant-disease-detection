@@ -11,10 +11,82 @@ Usage:
 
 import argparse
 import csv
+import json
 import shutil
 from pathlib import Path, PurePath
 
 from src.config import Config
+
+
+GRADER_HTML = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Severity grading</title>
+<style>
+ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#14200f;color:#eef3e8;
+      display:flex;flex-direction:column;align-items:center;min-height:100vh}
+ header{width:100%;background:#1e3318;padding:10px 18px;box-sizing:border-box}
+ h1{font-size:16px;margin:0 0 6px}
+ #bar{height:6px;background:#33502a;border-radius:3px;overflow:hidden}
+ #fill{height:100%;width:0;background:#8FB55E;transition:width .2s}
+ #meta{font-size:13px;color:#b9cfa8;margin-top:6px}
+ img{max-width:min(70vw,560px);max-height:56vh;border-radius:8px;margin:14px 0;background:#000}
+ .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+ button{font-size:15px;padding:10px 16px;border:0;border-radius:8px;cursor:pointer;background:#2C5F2D;color:#fff}
+ button:hover{background:#3d7a3e}
+ button.skip{background:#5a5a5a}
+ button.done{background:#C9A227;color:#1b1b1b;font-weight:600}
+ .hint{font-size:12.5px;color:#9db98c;margin:10px 0 4px;text-align:center;line-height:1.6}
+ textarea{width:min(90vw,760px);height:180px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+</style></head><body>
+<header>
+ <h1>Severity grading &mdash; __FOLDER__</h1>
+ <div id="bar"><div id="fill"></div></div>
+ <div id="meta"></div>
+</header>
+<img id="pic" alt="leaf">
+<div class="hint">
+ How much of the <b>LEAF</b> shows disease symptoms? Ignore the background.<br>
+ <b>0</b> none &nbsp;|&nbsp; <b>1</b> mild, under 5% &nbsp;|&nbsp; <b>2</b> moderate, 5&ndash;20% &nbsp;|&nbsp;
+ <b>3</b> severe, over 20% &nbsp;|&nbsp; <b>S</b> skip if unsure
+</div>
+<div class="btns">
+ <button onclick="grade(0)">0 &middot; none</button>
+ <button onclick="grade(1)">1 &middot; mild</button>
+ <button onclick="grade(2)">2 &middot; moderate</button>
+ <button onclick="grade(3)">3 &middot; severe</button>
+ <button class="skip" onclick="grade('')">S &middot; skip</button>
+ <button class="skip" onclick="back()">&larr; undo</button>
+</div>
+<div class="btns" style="margin-top:12px">
+ <button class="done" onclick="finish()">Show my grades.csv</button>
+</div>
+<textarea id="out" style="display:none" readonly></textarea>
+<script>
+const IMAGES=__IMAGES__, KEY="grades___FOLDER__";
+let g=JSON.parse(localStorage.getItem(KEY)||"{}"), i=0;
+function firstUngraded(){for(let k=0;k<IMAGES.length;k++)if(!(IMAGES[k] in g))return k;return IMAGES.length;}
+function show(){
+  i=Math.min(i,IMAGES.length-1);
+  const done=Object.keys(g).length;
+  document.getElementById("fill").style.width=(100*done/IMAGES.length)+"%";
+  document.getElementById("meta").textContent=`${done} / ${IMAGES.length} graded  -  now showing #${i+1}: ${IMAGES[i]}`;
+  document.getElementById("pic").src="images/"+IMAGES[i];
+}
+function grade(v){g[IMAGES[i]]=v;localStorage.setItem(KEY,JSON.stringify(g));i=firstUngraded();
+  if(i>=IMAGES.length){finish();}else{show();}}
+function back(){i=Math.max(0,i-1);delete g[IMAGES[i]];localStorage.setItem(KEY,JSON.stringify(g));show();}
+function finish(){
+  let csv="image,manual_grade\n";
+  IMAGES.forEach(n=>{csv+=n+","+(n in g?g[n]:"")+"\n";});
+  const t=document.getElementById("out");t.style.display="block";t.value=csv;t.select();
+  document.getElementById("meta").textContent="Done. Copy the text below into grades.csv, or save it as grades.csv.";
+}
+document.addEventListener("keydown",e=>{
+  if(["0","1","2","3"].includes(e.key))grade(parseInt(e.key));
+  else if(e.key.toLowerCase()==="s")grade("");
+  else if(e.key==="Backspace")back();});
+i=firstUngraded();show();
+</script></body></html>
+"""
 
 INSTRUCTIONS = """Severity grading - COMP9444 Project 090
 =======================================
@@ -64,6 +136,7 @@ def package(args):
         folder = root / f"annotator_{k + 1}"
         (folder / "images").mkdir(parents=True, exist_ok=True)
         (folder / "INSTRUCTIONS.txt").write_text(INSTRUCTIONS, encoding="utf-8")
+        names = []
         with (folder / "grades.csv").open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["image", "class", "manual_grade"])
@@ -72,7 +145,11 @@ def package(args):
                 name = f"{source.stem}.jpg"
                 shutil.copy2(source, folder / "images" / name)
                 writer.writerow([name, row["class"], ""])
-        print(f"  {folder.as_posix()}: {len(shard)} images")
+                names.append(name)
+        (folder / "grade.html").write_text(
+            GRADER_HTML.replace("__IMAGES__", json.dumps(names))
+                       .replace("__FOLDER__", folder.name), encoding="utf-8")
+        print(f"  {folder.as_posix()}: {len(shard)} images (open grade.html)")
     print(f"\nZip each annotator_N folder and send it. They fill `manual_grade` (0-3)\n"
           f"in grades.csv and return it. Then: python -m scripts.annotate --action merge")
 
