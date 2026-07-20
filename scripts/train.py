@@ -51,6 +51,9 @@ def parse_args():
     parser.add_argument("--image-size", type=int, default=None)
     parser.add_argument("--epochs", type=int, default=None)
     parser.add_argument("--lr", type=float, default=None)
+    parser.add_argument("--num-workers", type=int, default=None,
+                        help="lower this when running several arms concurrently; "
+                             "Windows spawns a full process per worker")
     parser.add_argument("--freeze-backbone", action="store_true",
                         help="train only the classification head (linear probe)")
     parser.add_argument("--head", choices=["flat", "hierarchical"], default="flat",
@@ -84,6 +87,8 @@ def main():
         cfg.train.epochs = args.epochs
     if args.lr:
         cfg.train.lr = args.lr
+    if args.num_workers is not None:
+        cfg.data.num_workers = args.num_workers
     if args.variant != "color":
         args.p_random = 0.0
     set_seed(cfg.seed)
