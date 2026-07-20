@@ -49,13 +49,34 @@ def parse_args():
                         choices=["plantvillage", "segmented", "grayscale", "plantdoc"],
                         default="plantvillage")
     parser.add_argument("--models", nargs="+", default=MEMBERS)
+    parser.add_argument("--checkpoints", nargs="+", default=None,
+                        help="checkpoint paths, parallel to --models; "
+                             "defaults to outputs/<name>_best.pth")
     parser.add_argument("--weights", type=float, nargs="+", default=None)
     parser.add_argument("--plantdoc", nargs="+", default=["data/PlantDoc/test"])
+    parser.add_argument("--image-size", type=int, default=None,
+                        help="override the config; must match how the checkpoint was trained")
     parser.add_argument("--tta", action="store_true")
     parser.add_argument("--out", default=None)
     parser.add_argument("--save-reports", action="store_true",
                         help="also write the classification report and confusion matrix")
     return parser.parse_args()
+
+
+def label_space(dataset, classes):
+    """Classes the evaluation set can actually contain, or None for all of them."""
+    if dataset != "plantdoc":
+        return None
+    from src.data.plantdoc import PLANTDOC_TO_PLANTVILLAGE
+    allowed = set(PLANTDOC_TO_PLANTVILLAGE.values())
+    return torch.tensor([c in allowed for c in classes])
+
+
+def crop_ids(classes):
+    """Map each class index to its crop, so species and disease can be scored apart."""
+    crops = sorted({c.split("___")[0] for c in classes})
+    lookup = {c: i for i, c in enumerate(crops)}
+    return torch.tensor([lookup[c.split("___")[0]] for c in classes]), len(crops)
 
 
 def build_eval_loader(cfg, dataset, plantdoc_dirs, classes):
@@ -80,6 +101,8 @@ def build_eval_loader(cfg, dataset, plantdoc_dirs, classes):
 def main():
     args = parse_args()
     cfg = Config.load(args.config)
+    if args.image_size:
+        cfg.data.image_size = args.image_size
     set_seed(cfg.seed)
     device = get_device()
     out_dir = Path(cfg.output_dir)
@@ -89,8 +112,11 @@ def main():
     print(f"evaluating on '{args.dataset}' ({n} images)\n")
 
     probs, targets, results = [], None, {}
-    for name in args.models:
-        model = load_model(name, len(classes), out_dir / f"{name}_best.pth", device)
+    paths = args.checkpoints or [out_dir / f"{n}_best.pth" for n in args.models]
+    if len(paths) != len(args.models):
+        raise SystemExit("--checkpoints must have one path per --models entry")
+    for name, path in zip(args.models, paths):
+        model = load_model(name, len(classes), path, device)
         member, targets = predict_loader(model, loader, device, tta=args.tta)
         probs.append(member)
         correct = int((member.argmax(1) == torch.tensor(targets)).sum())
@@ -109,7 +135,31 @@ def main():
     healthy = torch.tensor([1 if "healthy" in c.lower() else 0 for c in classes])
     results["ensemble_binary"] = round(
         float((healthy[y_pred] == healthy[y]).float().mean() * 100), 2)
+
+    # Where does the accuracy actually go? Score the species and the diagnosis apart,
+    # and score again with impossible classes masked out.
+    crop, n_crops = crop_ids(classes)
+    crop_hit = crop[y_pred] == crop[y]
+    results["ensemble_crop"] = round(float(crop_hit.float().mean() * 100), 2)
+    results["ensemble_disease_given_crop"] = round(
+        float((y_pred[crop_hit] == y[crop_hit]).float().mean() * 100), 2) if int(crop_hit.sum()) else 0.0
+    results["n_crops"] = n_crops
+
+    mask = label_space(args.dataset, classes)
+    if mask is not None:
+        restricted = ensemble.clone()
+        restricted[:, ~mask] = float("-inf")
+        y_restricted = restricted.argmax(1)
+        results["ensemble_restricted"] = round(float((y_restricted == y).float().mean() * 100), 2)
+        results["n_classes_possible"] = int(mask.sum())
+
     print(f"  {'binary h/d':14s} {results['ensemble_binary']:6.2f}%")
+    print(f"  {'crop only':14s} {results['ensemble_crop']:6.2f}%   "
+          f"(chance {100.0 / n_crops:.1f}%)")
+    print(f"  {'disease|crop':14s} {results['ensemble_disease_given_crop']:6.2f}%")
+    if mask is not None:
+        print(f"  {'restricted':14s} {results['ensemble_restricted']:6.2f}%   "
+              f"({int(mask.sum())} reachable classes)")
     results["n_images"] = n
     results["dataset"] = args.dataset
 
