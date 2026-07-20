@@ -42,7 +42,8 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H13 | The Otsu-versus-official-mask AUC gap is segmentation error, not a ceiling on the lesion-ratio feature, so a better unsupervised mask recovers part of it. | open |
 | H14 | Background randomisation buys little zero-shot, but leaves features that *adapt* better, so its advantage grows under supervised adaptation rather than disappearing. | open |
 | H15 | E15 shows the frozen ImageNet backbone already does all the field-transferable work, so field accuracy should track **backbone quality and pretraining diversity** rather than anything done on PlantVillage. A stronger frozen CNN should therefore move the field number where six PlantVillage-side interventions could not. | open |
-| H16 | A severity head trained to regress the official-mask lesion ratio beats re-deriving that mask with Otsu at inference, because it learns the mask from image features instead of approximating it with a colour heuristic. | open |
+| H16 | A severity head trained to regress the official-mask lesion ratio beats re-deriving that mask with Otsu at inference, because it learns the mask from image features instead of approximating it with a colour heuristic. | **rejected** — within-class rho 0.41 against Otsu's 0.78. The head's AUC of 0.9357 is class identity, not severity: it reads which class the leaf belongs to and emits that class's typical ratio |
+| H17 | Classification training on PlantVillage actively destroys severity information, because colour and texture augmentation exists to make the model invariant to exactly what severity is made of. Training both objectives together should recover it, possibly at a small cost in classification accuracy. | **first half confirmed** — a pristine ImageNet backbone carries rho 0.61 against the fine-tuned backbone's 0.41; joint training untested |
 
 ### The clearest single result: 574x the parameters, and the field gets worse
 
@@ -168,7 +169,8 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E22 | Two-way healthy/diseased head, trained directly | H12 | matched to E8 `p = 0.7` in every respect but the output space; control is binary collapsed from the same arm's 38-way predictions | open |
 | E23 | Alternative unsupervised leaf mask | H13 | current `_leaf_mask` heuristic is the control, scored by Dice *and* by the severity AUC it produces | open |
 | E24 | Frozen-backbone ladder: ResNet-18 → ResNet-50 (V1) → ResNet-50 (V2) → ConvNeXt-T → RegNet-Y-16GF (SWAG) | H15 | each rung moves **one** factor — capacity, then training recipe, then architecture generation, then pretraining data. ResNet-18 under the same cached-feature protocol is the control | open |
-| E25 | Multi-task head: classification **and** severity regression on one backbone | H16 | Otsu ratio (AUC 0.767) is the floor it must beat; official-mask ratio (0.868) is the ceiling, since that one reads ground-truth masks | open |
+| E25 | Multi-task head: classification **and** severity regression on one backbone | H16 | Otsu ratio (AUC 0.767) is the floor it must beat; official-mask ratio (0.868) is the ceiling, since that one reads ground-truth masks | done — **rejected on within-class rho**, see §4 |
+| E26 | Joint training: backbone updated by classification **and** severity loss together | H17 | three measured controls on one test split — fine-tuned frozen features 0.41, ImageNet frozen features 0.61, Otsu 0.78. Must clear **0.78** within-class to make severity worth taking from the network | open |
 
 ## 4. What would falsify the conclusions
 
@@ -184,6 +186,11 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If E9 (trained on `segmented`) scored poorly *in-domain*, the E4 collapse
   would be explained by loss of information rather than loss of a shortcut.
 - If E13's AUC were near 0.5, the severity signal would be meaningless.
+- If E26's joint training does not reach a within-class rho of 0.78, the classical
+  estimator is the better severity tool and Task 2 is reported that way — with the
+  honest consequence stated, that severity is then a pipeline beside the model
+  rather than an output of it. Three frozen-feature controls are already measured
+  on the same test split, so the arm is falsifiable the moment it finishes.
 - If accuracy is flat across test-time zoom factors (E19) *and* E20's crop accuracy
   fails to beat E8 by more than the Wilson interval on the 2,525 basis, H10 is
   rejected: the compositional gap cannot be synthesised from detached leaves, and
@@ -196,6 +203,17 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
   severity is reported as a classical estimator rather than a model output. Note
   the brief asks to *expand the model* to estimate severity, so this arm is what
   makes the second task a property of the network rather than a pipeline beside it.
+
+  **This condition was inadequate and is recorded as such rather than quietly
+  replaced.** Healthy-versus-diseased AUC is largely answerable from class identity,
+  and binary accuracy on PlantVillage is 100.00%, so a head reading classifier
+  features clears the bar without measuring any leaf. It scored 0.9357 — above even
+  the official-mask ceiling — while being *worse* than Otsu at predicting the actual
+  ratio (rho 0.76 vs 0.87, MAE 0.091 vs 0.050). The pass is not claimed. The
+  criterion that should have been set is **within-class Spearman**, which removes
+  class identity as a route; on that measure the head reaches 0.41 against Otsu's
+  0.78 and H16 is rejected. Revising a criterion after seeing results is only
+  defensible in the direction of claiming *less*, which is the direction taken here.
 - If field accuracy is flat along the whole E24 ladder — including the jump from
   ImageNet to SWAG's 3.6B web images — H15 is rejected, and the ceiling is the
   domain gap itself rather than feature quality. That would be the seventh
