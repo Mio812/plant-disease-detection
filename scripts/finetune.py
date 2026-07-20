@@ -52,6 +52,9 @@ def parse_args():
     parser.add_argument("--epochs", type=int, default=15)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--image-size", type=int, default=None)
+    parser.add_argument("--num-workers", type=int, default=None,
+                        help="lower this when running several arms concurrently; "
+                             "Windows spawns a full process per worker")
     parser.add_argument("--tag", default=None, help="output name; defaults to the checkpoint stem")
     return parser.parse_args()
 
@@ -61,6 +64,8 @@ def main():
     cfg = Config.load(args.config)
     if args.image_size:
         cfg.data.image_size = args.image_size
+    if args.num_workers is not None:
+        cfg.data.num_workers = args.num_workers
     set_seed(cfg.seed)
     device = get_device()
 

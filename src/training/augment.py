@@ -32,7 +32,9 @@ def random_background(size, rng):
     else:
         small = np.random.randint(0, 256, (max(2, h // 32), max(2, w // 32), 3), dtype=np.uint8)
         bg = np.array(Image.fromarray(small).resize((w, h), Image.BICUBIC))
-    noise = np.random.normal(0, 8, bg.shape)
+    # normal() yields float64, which doubles the peak through the add and the clip.
+    # Casting rather than switching generator keeps the draw sequence identical.
+    noise = np.random.normal(0, 8, bg.shape).astype(np.float32)
     return np.clip(bg.astype(np.float32) + noise, 0, 255).astype(np.uint8)
 
 
