@@ -51,14 +51,22 @@ plant-disease-detection/
 │   ├── metrics.py              # accuracy, P/R/F1, confusion matrix
 │   ├── severity.py             # lesion-area severity estimation
 │   ├── ensemble.py             # soft-voting ensemble of the baselines
+│   ├── bias.py                 # background-bias probes, segmented-mask matching
+│   ├── crossdata.py            # PlantDoc -> PlantVillage class mapping
 │   ├── visualize.py            # EDA and results plots
 │   └── utils.py                # seed, device, checkpoints
 ├── scripts/
 │   ├── download_data.py        # fetch PlantVillage into data/
+│   ├── download_plantdoc.py    # fetch the PlantDoc field-image test split
 │   ├── train.py                # train from a config
 │   ├── evaluate.py             # evaluate a checkpoint on the test split
 │   ├── predict.py              # classify + estimate severity for one image
-│   └── ensemble.py             # evaluate the soft-voting ensemble
+│   ├── ensemble.py             # evaluate the soft-voting ensemble
+│   ├── bias_probe.py           # predict the class from background pixels alone
+│   ├── eval_segmented.py       # re-score models with the background removed
+│   ├── eval_plantdoc.py        # zero-shot evaluation on field images
+│   ├── severity_sample.py      # sample leaves for manual severity grading
+│   └── severity_validate.py    # score severity against manual grades
 ├── notebooks/
 │   └── plant_disease_detection.ipynb
 ├── report/                     # summary report (.docx) and slides (.pptx)
@@ -133,6 +141,16 @@ uv run python -m scripts.predict --config configs/default.yaml --checkpoint outp
 
 # 5. Evaluate the soft-voting ensemble of the three baselines
 uv run python -m scripts.ensemble --config configs/default.yaml
+
+# 6. Generalisation analysis (see "Reality check" below)
+uv run python -m scripts.bias_probe          # class from background pixels only
+uv run python -m scripts.eval_segmented      # background removed
+uv run python -m scripts.download_plantdoc   # fetch field images (once)
+uv run python -m scripts.eval_plantdoc       # zero-shot on field images
+
+# 7. Severity: sample for grading, then validate against manual grades
+uv run python -m scripts.severity_sample --n 150
+uv run python -m scripts.severity_validate --csv outputs/severity_annotations.csv
 ```
 
 Open the notebook for the full analysis:
