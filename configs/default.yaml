@@ -21,5 +21,7 @@ train:
   early_stop_patience: 7
 
 severity:
-  thresholds: [0.05, 0.20, 0.50]
+  # E14 compares these bands against manual grades one-to-one, so they must stay
+  # aligned with the rubric in scripts/annotate.py. Fixed before any grading.
+  thresholds: [0.005, 0.05, 0.20]
   levels: [healthy, mild, moderate, severe]

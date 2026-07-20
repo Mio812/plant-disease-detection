@@ -36,6 +36,8 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
 | H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **partly rejected** — it ties, it does not win |
 | H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | open |
+| H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
+| H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | open |
 
 ### The clearest single result: 574x the parameters, no field gain
 
@@ -56,7 +58,8 @@ indirect evidence of E3 and E5. The two accuracies are decoupled.
 ### What the field accuracy is actually made of
 
 Reporting a single 24% hides the failure mode. Decomposing the best zero-shot arm
-(ResNet-18, strong augmentation, `p = 0.7`, 224px) on the PlantDoc test split:
+(ResNet-18, strong augmentation, `p = 0.7`, 224px) on the 236-image PlantDoc test
+split:
 
 | Level | Accuracy | Chance |
 |---|---|---|
@@ -70,6 +73,12 @@ Reporting a single 24% hides the failure mode. Decomposing the best zero-shot ar
 the species is right the diagnosis is 1.6x chance, which is weak but real; the
 species itself is right less than half the time. The bottleneck is therefore
 recognising the plant, not recognising the disease.
+
+Every figure in that table is on n = 236. `scripts/train.py` prints only the total
+for that split and never the decomposition, so no arm's crop accuracy can be read
+off a training log. E16 re-scores each 224 arm on all 2,525 field images, and
+cross-arm comparisons — E17 against E8 above all — are made on that basis alone.
+The two are never mixed.
 
 This is consistent with H2 rather than a separate finding. PlantVillage shows one
 detached leaf, centred, flat, filling the frame; PlantDoc shows whole plants at
@@ -122,11 +131,14 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E11 | Few-shot fine-tune on PlantDoc train | supervised ceiling | **reported separately** — touches target labels | partial |
 | E12 | Leaf segmentation vs official masks (Dice) | H6 | official mask is ground truth | done |
 | E13 | Lesion ratio separates healthy vs diseased (ROC-AUC) | H6 | needs no manual labels | done |
-| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, graded by the team | open |
+| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, graded by the team; bands fixed to the rubric before grading | open |
 | E15 | Frozen backbone vs full fine-tune, crossed with `p ∈ {0.0, 0.7}` | H8 | 2x2 factorial: separates both main effects and their interaction | open |
 | E16 | Crop / disease / restricted decomposition of every 224 arm | H7 | scored on all 2,525 PlantDoc images, not the 236-image split | open |
 | E17 | Factorised crop-then-disease head | H9 | matched to E8 in every respect but the head | open |
 | E18 | Adaptation curve at 5 / 20 / 50 / 100 / all shots | supervised ceiling | one point is not a curve; shows how much field data is actually needed | open |
+| E19 | Score PlantDoc at several test-time zoom factors | H10 | the current single 1.0x resize is the control; E7 varied flips and BatchNorm but never scale | open |
+| E20 | Train with the leaf composited at 20-60% of the frame | H10 | matched to E8 `p = 0.7` in every respect but leaf scale | open |
+| E21 | Field accuracy stratified by luminance, contrast and sharpness | H11 | standard-augmentation baseline is the control; Wilson interval per bin | open |
 
 ## 4. What would falsify the conclusions
 
@@ -142,6 +154,13 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If E9 (trained on `segmented`) scored poorly *in-domain*, the E4 collapse
   would be explained by loss of information rather than loss of a shortcut.
 - If E13's AUC were near 0.5, the severity signal would be meaningless.
+- If accuracy is flat across test-time zoom factors (E19) *and* E20's crop accuracy
+  fails to beat E8 by more than the Wilson interval on the 2,525 basis, H10 is
+  rejected: the compositional gap cannot be synthesised from detached leaves, and
+  only real field data closes it.
+- If every arm degrades at the same rate across the capture-quality bins (E21),
+  H11 is rejected. 073-2 is then reported as *evaluated under* natural variation
+  rather than *robust to* it, in the same way E7 and E8 are reported.
 
 ## 5. Mapping to the brief and the rubric
 
@@ -176,3 +195,10 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 7. Known threats to validity: PlantDoc carries label noise;
    its train/test splits are known to differ in content; our field evaluation is
    236 images (±5 points), so the full-dataset variant is also reported.
+8. E14's severity bands were realigned to the annotation rubric before any leaf
+   was graded. The two had disagreed by one level — the estimator called anything
+   under 5% lesion area `healthy`, while annotators were told under 5% was `mild`
+   — which put 85% of the sample in a different bin. Left alone, a flawless
+   annotator would have scored κ = 0.63 at 15% exact agreement purely from the
+   offset. E12's Dice and E13's ROC-AUC come from continuous ratios and are
+   unchanged (0.868 / 0.767 before and after).
