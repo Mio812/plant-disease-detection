@@ -91,10 +91,17 @@ i=firstUngraded();show();
 INSTRUCTIONS = """Severity grading - COMP9444 Project 090
 =======================================
 
-Open each image in the `images` folder and grade how much of the LEAF AREA
-shows disease symptoms (lesions, spots, discolouration, necrosis).
+EASIEST WAY: double-click `grade.html`. It shows one leaf at a time and you
+press 0-3. Nothing to install, progress is saved automatically.
 
-Write one number in the `manual_grade` column of grades.csv:
+You are grading how much of the LEAF AREA shows disease symptoms (lesions,
+spots, discolouration, necrosis).
+
+The file names are dataset ids - they are meant to look meaningless, and the
+disease name is deliberately hidden so your judgement is not biased. Just look
+at the leaf.
+
+If you prefer the spreadsheet, write one number in the `manual_grade` column:
 
     0 = healthy     no visible symptoms
     1 = mild        symptoms on roughly < 5% of the leaf
@@ -108,6 +115,7 @@ Guidance
   should be uncommon - use it when you genuinely see no symptoms.
 - If you cannot tell, leave the cell empty rather than guessing.
 - Do not change any other column, and do not rename files.
+- The rows are in no particular order; grade each image on its own.
 
 Send grades.csv back when done.
 """
@@ -139,12 +147,12 @@ def package(args):
         names = []
         with (folder / "grades.csv").open("w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow(["image", "class", "manual_grade"])
+            writer.writerow(["no", "image", "manual_grade"])
             for row in shard:
                 source = Path(row["path"].replace("\\", "/"))
                 name = f"{source.stem}.jpg"
                 shutil.copy2(source, folder / "images" / name)
-                writer.writerow([name, row["class"], ""])
+                writer.writerow([len(names) + 1, name, ""])
                 names.append(name)
         (folder / "grade.html").write_text(
             GRADER_HTML.replace("__IMAGES__", json.dumps(names))
