@@ -83,7 +83,10 @@ Its two tasks:
 - [ ] a severity **head on the CNN** (E25/E26) — this is what literally satisfies
       "expand the model", even where the classical Otsu ratio grades finer
 - [ ] the estimator reported honestly: presence AUC, within-class rho vs Otsu
-- [ ] **E14** — 150 human grades, the only external check. Still 0. The gate.
+- [x] **E14** — 150 human grades, two annotators. Done. Inter-annotator κ 0.72;
+      lesion-ratio vs consensus ρ 0.47 / κ 0.29 (weak proxy, honest RQ3 answer).
+      Raw grades in outputs/annotation/grade{1-4}.csv (A) and grades{1-4}.csv (B) —
+      irreplaceable, back these up (outputs/ is gitignored)
 
 **Core 090 analysis (exploratory + discussion, not bonus)**
 - [ ] leaf-leakage / test integrity — the split fix and its inflation number

@@ -158,7 +158,7 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E11 | Few-shot fine-tune on PlantDoc train | supervised ceiling | **reported separately** — touches target labels | partial |
 | E12 | Leaf segmentation vs official masks (Dice) | H6 | official mask is ground truth | done |
 | E13 | Lesion ratio separates healthy vs diseased (ROC-AUC) | H6 | needs no manual labels | done |
-| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, graded by the team; bands fixed to the rubric before grading | open |
+| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, two annotators; bands fixed to the rubric before grading | **done — weak.** Two graders agree at κ 0.72 (the ceiling); the lesion-ratio grade tracks them at only ρ 0.47 / κ 0.29, mis-calibrated at the healthy/mild boundary |
 | E15 | Frozen backbone vs full fine-tune, crossed with `p ∈ {0.0, 0.7}` | H8 | 2x2 factorial: separates both main effects and their interaction | open |
 | E16 | Crop / disease / restricted decomposition of every 224 arm | H7 | scored on all 2,525 PlantDoc images, not the 236-image split | open |
 | E17 | Factorised crop-then-disease head | H9 | matched to E8 in every respect but the head | open |
@@ -186,6 +186,14 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If E9 (trained on `segmented`) scored poorly *in-domain*, the E4 collapse
   would be explained by loss of information rather than loss of a shortcut.
 - If E13's AUC were near 0.5, the severity signal would be meaningless.
+- E14 outcome (recorded honestly): two annotators graded all 150 leaves and agree
+  at quadratic κ 0.72, so the grade is well-defined. The lesion-ratio estimate
+  tracks the human consensus at ρ 0.47 (p < 0.001) and κ 0.29 — a real but weak
+  signal, far below the human ceiling. The model never outputs "healthy" while
+  humans call ~30% of these diseased leaves symptom-free, so the miscalibration is
+  specifically at the healthy/mild boundary. Severity from image features is
+  therefore reported as a **weak proxy, not a trustworthy grade** — the honest RQ3
+  answer, not a failure to complete Task 2.
 - If E26's joint training does not reach a within-class rho of 0.78, the classical
   estimator is the better severity tool and Task 2 is reported that way — with the
   honest consequence stated, that severity is then a pipeline beside the model
