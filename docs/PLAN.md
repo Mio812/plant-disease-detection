@@ -31,6 +31,16 @@ itself a finding and gets recorded.
 Leaky reference (to be replaced by honest numbers): ensemble 99.84 / binary 100.00;
 resnet18 arms 99.52 / 99.26 / 91.70 (frozen) / 99.24 (seg) / 98.48 (gray).
 
+## Tomorrow, first thing
+
+**E26 — joint training (H17), the one remaining Task 2 strengthener.** Pre-registered
+(bar: within-class rho > 0.78 vs Otsu). Needs a new two-head script (classification +
+severity regression on one backbone, combined loss), CPU verification, a ~50-min
+joint run, then within-class rho vs Otsu. ~90 min total, so deferred from today.
+Task 2 is complete without it; E26 only tries to make the learned severity head beat
+the classical estimator. Report the result either way, including any small Task 1
+trade-off. Then: report (.docx) and PPT.
+
 ## Rule for this phase
 
 **Finish the experiments before writing the report.** Every number that can still
