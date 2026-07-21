@@ -33,13 +33,20 @@ resnet18 arms 99.52 / 99.26 / 91.70 (frozen) / 99.24 (seg) / 98.48 (gray).
 
 ## Tomorrow, first thing
 
-**E26 — joint training (H17), the one remaining Task 2 strengthener.** Pre-registered
-(bar: within-class rho > 0.78 vs Otsu). Needs a new two-head script (classification +
-severity regression on one backbone, combined loss), CPU verification, a ~50-min
-joint run, then within-class rho vs Otsu. ~90 min total, so deferred from today.
-Task 2 is complete without it; E26 only tries to make the learned severity head beat
-the classical estimator. Report the result either way, including any small Task 1
-trade-off. Then: report (.docx) and PPT.
+**E26 — joint training (H17).** Script built and CPU-verified (`scripts/train_joint.py`;
+unit checks + smoke test passed). Just launch on the free GPU:
+
+    uv run python -m scripts.train_joint
+
+Defaults: standard augmentation (strong ColorJitter would randomise the colour severity
+needs), 20 epochs, 224px, severity_weight 10. ~50 min. Compare `within_class_rho_head`
+to Otsu 0.78 and to E25's frozen probes (0.38 fine-tuned / 0.61 ImageNet) in
+`outputs/joint_severity.json`. If it beats 0.78, H17 confirmed and severity becomes a
+model output; if not, record it and Task 2 stands on the honest classical estimator.
+`severity_weight` may need a second value (try 5 and 20) if 10 under/over-weights.
+Also note `classification_accuracy` for any Task 1 trade-off.
+
+Then: report (.docx) and PPT, with PlantDoc/073 as the discussion-level extension.
 
 ## Rule for this phase
 
