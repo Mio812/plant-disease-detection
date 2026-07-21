@@ -127,8 +127,15 @@ def summarise(out_dir):
                      f"{sev['auc_otsu_mask']:.3f} Otsu")
     val = read(out_dir / "severity_validation.json")
     if val:
-        extra.append(f"E14 severity vs manual: rho={val['spearman_rho']:.3f}, "
-                     f"kappa={val['quadratic_kappa']:.3f}")
+        cal = val.get("quadratic_kappa_recalibrated_cv")
+        ceiling = val.get("inter_annotator_kappa_mean_pairwise") or val.get("inter_annotator_kappa")
+        line = (f"E14 severity vs manual ({val.get('annotators', 1)} annotators): "
+                f"rho={val['spearman_rho']:.3f}, kappa={val['quadratic_kappa']:.3f}")
+        if cal:
+            line += f" -> {cal:.3f} recalibrated (CV)"
+        if ceiling:
+            line += f"; human ceiling {ceiling:.3f}"
+        extra.append(line)
 
     # Where the field accuracy actually goes: species vs diagnosis, on full PlantDoc.
     arms = [("bg_control", "Strong aug only"), ("bg_random", "Background randomised"),

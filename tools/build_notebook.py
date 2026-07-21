@@ -162,6 +162,30 @@ md("This is the pivotal result of the exploratory phase. A classifier that never
    "accuracy on this dataset is partly measuring **capture bias**. Everything in",
    "Section 6 follows from it.")
 
+md("### 4.3 Test-set integrity — leaf grouping",
+   "",
+   "PlantVillage photographs each physical leaf several times. `leaf-map.json`, shipped",
+   "with the dataset, records which images share a leaf. A naive random split scatters",
+   "those near-duplicates across train and test, so the test score partly rewards",
+   "recognising leaves already seen. We measured it: on a random split **74.7% of test",
+   "images had a same-leaf twin in training**. We therefore split by *leaf* — every",
+   "image of a leaf stays on one side — which removes the leakage (0% by construction)",
+   "and is the split used everywhere below.",
+   "",
+   "A perceptual re-check bounds what the map missed (a frozen ImageNet embedding,",
+   "calibrated against different-leaf-same-class pairs). It flags ~10.7% of test images,",
+   "but the same-leaf and same-class distributions overlap heavily, so this over-counts",
+   "PlantVillage's near-identical *distinct* leaves; the true residual is well below it.",
+   "The decisive check is that removing the known leakage cost only ~0.3 accuracy",
+   "points on the ensemble — structural leakage would have cost far more.")
+
+code("res = load('residual_leakage.json')",
+    "if res:",
+    "    print(f\"random-split leakage (measured earlier): 74.7% of test had a same-leaf twin in train\")",
+    "    print(f\"leaf-grouped split: 0% by construction\")",
+    "    print(f\"residual near-duplicate upper bound: {res['test_flagged_pct']:.1f}% \"",
+    "          f\"(over-counts look-alikes; separation only {res['separation']:.2f} cosine)\")")
+
 # ---------------------------------------------------------- 5. Models/methods
 md("## 5. Models and methods",
    "",
@@ -290,10 +314,9 @@ md("### 6.3 Closing the gap (E8–E11)",
 
 code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "        ('resnet18_color_strong_p70_224',  'background randomised p=0.7'),",
-    "        ('resnet18_color_strong_p100_224', 'background randomised p=1.0'),",
     "        ('resnet18_segmented_strong_p0_224', 'trained on segmented'),",
     "        ('resnet18_grayscale_strong_p0_224', 'trained on grayscale'),",
-    "        ('resnet50_color_strong_p70_224',  'ResNet-50, p=0.7')]",
+    "        ('resnet18_color_strong_p70_224_hier', 'hierarchical crop-then-disease')]",
     "rows = []",
     "for tag, label in runs:",
     "    h = load(f'{tag}_history.json')",
@@ -302,20 +325,61 @@ code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "                 'PlantVillage': round(h['test_metrics']['accuracy'] * 100, 2),",
     "                 'PlantDoc (field)': round(h['plantdoc_accuracy'], 2) if h.get('plantdoc_accuracy') else None,",
     "                 'epochs': len(h['history'])})",
-    "for tag, label in [('ft_robust', 'fine-tuned 20-shot (from robust)'),",
-    "                   ('ft_baseline', 'fine-tuned 20-shot (from baseline)')]:",
-    "    h = load(f'{tag}_history.json')",
-    "    if h:",
-    "        rows.append({'setting': label, 'PlantVillage': None,",
-    "                     'PlantDoc (field)': round(h['best'], 2), 'epochs': len(h['history'])})",
     "pd.DataFrame(rows).set_index('setting') if rows else print('training still running')")
 
 md("A drop in the PlantVillage column is **expected and acceptable**: it is the price",
    "of giving up the shortcut. The column that matters for the brief's stated purpose",
-   "is PlantDoc. The fine-tuned rows are supervised domain adaptation and are reported",
-   "separately from the zero-shot rows because they use target-domain labels.")
+   "is PlantDoc — and note that grayscale, which scores ~98% in the lab, collapses in",
+   "the field: colour is doing work the lab never tests.")
 
-md("### 6.4 RQ3 — severity (E12–E14)")
+md("### 6.4 The clearest control — 574x the parameters, no field gain (E15)",
+   "",
+   "The strongest single result. We train **only the 19,494-parameter head** and leave",
+   "the 11.2M-parameter ImageNet backbone frozen, versus fine-tuning everything. Crossed",
+   "with background randomisation, it is a 2x2 factorial, scored on all 2,525 field",
+   "images (E16).")
+
+code("import numpy as np",
+    "arms = [('bg_control','full fine-tune, p=0.0'), ('bg_random','full fine-tune, p=0.7'),",
+    "        ('frozen_ctrl','frozen backbone, p=0.0'), ('frozen_bg','frozen backbone, p=0.7')]",
+    "rows = []",
+    "for tag, label in arms:",
+    "    d = load(f'eval_arm_{tag}.json')",
+    "    hist_tag = {'bg_control':'resnet18_color_strong_p0_224','bg_random':'resnet18_color_strong_p70_224',",
+    "                'frozen_ctrl':'resnet18_color_strong_p0_224_frozen','frozen_bg':'resnet18_color_strong_p70_224_frozen'}[tag]",
+    "    h = load(f'{hist_tag}_history.json')",
+    "    if not d or not h: continue",
+    "    rows.append({'arm': label, 'trainable params': f\"{h['trainable_parameters']:,}\",",
+    "                 'PlantVillage': round(h['test_metrics']['accuracy']*100,2),",
+    "                 'PlantDoc 38-way': d['ensemble'], 'crop': d['ensemble_crop']})",
+    "pd.DataFrame(rows).set_index('arm') if rows else print('E15/E16 pending')")
+
+md("Freezing the backbone costs ~8 points of PlantVillage accuracy and **matches or",
+   "beats** full fine-tuning in the field. The lab points that 574x more trainable",
+   "parameters buy are worth nothing — often less than nothing — outside the benchmark.",
+   "This decouples the two accuracies with a direct control, not an inference.")
+
+md("### 6.5 Where the field accuracy goes, and how much data closes it (E11, E16, E18)",
+   "",
+   "Field accuracy factorises as *crop identification x diagnosis given the crop*. The",
+   "bottleneck is recognising the plant, not the disease. Supervised adaptation is the",
+   "honest fix — and reported separately, because it uses target-domain labels.")
+
+code("d = load('eval_arm_bg_random.json')",
+    "if d:",
+    "    print(f\"zero-shot decomposition (bg-random, 2,525 field images):\")",
+    "    print(f\"  all 38 classes   {d['ensemble']:.2f}%\")",
+    "    print(f\"  crop only        {d['ensemble_crop']:.2f}%\")",
+    "    print(f\"  disease | crop   {d['ensemble_disease_given_crop']:.2f}%\")",
+    "    print(f\"  healthy/diseased {d['ensemble_binary']:.2f}%\")",
+    "curve = [(5,'ft_shots5'),(20,'ft_robust'),(50,'ft_shots50'),(100,'ft_shots100'),('all','ft_full')]",
+    "pts = [(s, load(f'{t}_history.json')) for s,t in curve]",
+    "pts = [(s,d['best']) for s,d in pts if d]",
+    "if pts:",
+    "    print('\\nadaptation curve (PlantDoc 20-shot fine-tune, 236-image test):')",
+    "    for s,b in pts: print(f\"  {str(s):>4} shots  {b:.2f}%\")")
+
+md("### 6.6 RQ3 — severity from image features (E12–E14)")
 
 code("sev = load('severity_probe.json')",
     "val = load('severity_validation.json')",
@@ -324,18 +388,28 @@ code("sev = load('severity_probe.json')",
     "    print(f\"ROC-AUC healthy vs diseased, official mask : {sev['auc_official_mask']:.3f}\")",
     "    print(f\"mean lesion ratio  healthy {sev['mean_ratio_healthy_official']:.3f} "
     "| diseased {sev['mean_ratio_diseased_official']:.3f}\")",
-    "    print(f\"grade distribution on diseased leaves: {sev['diseased_grade_distribution']}\")",
     "if val:",
-    "    print(f\"\\nagainst {val['n_graded']} manual grades: rho={val['spearman_rho']:.3f}, \"",
-    "          f\"MAE={val['mae_levels']:.2f} levels, quadratic kappa={val['quadratic_kappa']:.3f}\")",
-    "else:",
-    "    print('\\nmanual grading pending (scripts.annotate --action package)')")
+    "    n_ann = val.get('annotators', 1)",
+    "    ceil = val.get('inter_annotator_kappa_mean_pairwise') or val.get('inter_annotator_kappa')",
+    "    print(f\"\\n{n_ann} annotators, {val['n_graded']} leaves. Human agreement (ceiling): kappa {ceil:.2f}\")",
+    "    print(f\"lesion-ratio grade vs consensus: rho {val['spearman_rho']:.2f}, \"",
+    "          f\"kappa {val['quadratic_kappa']:.2f} (rubric bands)\")",
+    "    cal = val.get('quadratic_kappa_recalibrated_cv')",
+    "    if cal: print(f\"recalibrated to the grades (5-fold CV): kappa {cal:.2f}  \"",
+    "                  f\"-- about {100*cal/ceil:.0f}% of the human ceiling\")")
 
-md("The lesion ratio is near zero on healthy leaves and much larger on diseased ones,",
-   "so it measures something real, and the official masks beat Otsu segmentation —",
-   "which is why they are preferred. The grade distribution exposes a calibration",
-   "weakness we report honestly: with the current 0.05 cut-off a noticeable share of",
-   "diseased leaves is graded *healthy*.")
+md("Three findings, reported honestly:",
+   "",
+   "- **Presence** (E13): the lesion-area ratio separates healthy from diseased at",
+   "  AUC 0.87 with official masks — a real image feature, no labels needed.",
+   "- **Grade** (E14): three annotators agree at quadratic kappa ~0.63 (the ceiling).",
+   "  The lesion-ratio grade tracks their consensus at kappa 0.30 with the rubric",
+   "  bands, rising to **0.47 under cross-validated recalibration** — a *moderate*",
+   "  proxy reaching ~74% of the human ceiling, honestly not matching it.",
+   "- **A learned severity head does worse.** A regression head on the CNN features",
+   "  reaches within-class rho 0.38 against the classical estimator's 0.78: PlantVillage",
+   "  classification training discards the colour/texture detail severity needs, the",
+   "  same phenomenon the frozen-backbone result shows on a different axis.")
 
 # ------------------------------------------------------------- 7. Discussion
 md("## 7. Discussion",
