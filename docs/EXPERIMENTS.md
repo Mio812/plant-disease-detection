@@ -118,6 +118,19 @@ H8 follows directly. If PlantVillage rewards shortcut features, then updating al
 11.2M weights on it should actively damage the ImageNet features that would have
 transferred, and training only the 19K-parameter head should transfer better.
 
+### Residual leakage after the leaf-grouped split
+
+The split removes every same-leaf group the map records (74.7% of the test set on
+the random split → 0% here). A perceptual re-check bounds what the map missed:
+embed every image with a frozen ImageNet backbone and flag test images more similar
+to an out-of-group train image than 99.9% of different-leaf-same-class pairs. That
+flags **10.68%** — but the same-leaf and same-class-different-leaf similarity
+distributions separate by only 0.11 cosine, so PlantVillage's near-identical
+*distinct* leaves inflate this: the true residual is below 10.7%, likely well
+below. The decisive evidence it is immaterial is that removing the known leakage
+cost only 0.5 accuracy points (99.9→99.6); structural residual leakage would cost
+far more.
+
 ### Why we build our own split
 
 The PlantVillage repository ships `data_distribution_for_SVM/`, a train/test
