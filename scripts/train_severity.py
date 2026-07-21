@@ -1,22 +1,7 @@
-"""E25: severity as an output of the classifier rather than a pipeline beside it.
-
-Brief task 2 asks to *expand the model* to estimate severity from image features.
-The existing estimator does not touch the network -- it thresholds HSV colour --
-so this attaches a severity head to a trained classification backbone and
-regresses the lesion ratio measured from the official segmented masks.
-
-The point is what happens at inference. Otsu has to re-derive the leaf mask from
-the image and loses accuracy doing it; a head that learned the mask implicitly
-needs no mask at all. Both bounds are measured on the same test split here, so
-the arm is falsifiable on arrival: it has to beat Otsu to be worth having.
-
-The target is sqrt(ratio). Raw lesion ratio is heavily skewed, and sqrt is
-monotone, so ranking metrics are untouched while the optimiser gets a far better
-conditioned target.
-
-Usage:
-    python -m scripts.train_severity
-    python -m scripts.train_severity --limit 400        # smoke test
+"""E25: a severity head on the classification backbone, regressing official-mask
+lesion ratio, scored against the Otsu floor and official-mask ceiling on one test
+split. Target is sqrt(ratio): monotone, so ranking is unchanged, but better
+conditioned for the optimiser.
 """
 
 import argparse

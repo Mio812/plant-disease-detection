@@ -311,12 +311,7 @@ def probe_severity_validate(cfg, args):
 
 
 def probe_paired(cfg, args):
-    """McNemar between two arms scored on the same images.
-
-    E8 and E15 each compare arms over one PlantDoc pass. Wilson intervals describe
-    a single accuracy and know nothing about the pairing, so they answer a weaker
-    question than the design supports.
-    """
+    """McNemar between two arms scored on the same images (E8, E15)."""
     from src.evaluation import mcnemar
     from src.models.hierarchical import crop_of
 

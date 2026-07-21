@@ -1,21 +1,8 @@
-"""Quantify residual leakage the leaf-map missed -- calibrated against hard negatives.
+"""Bound the residual same-leaf leakage the leaf-map missed.
 
-The leaf-grouped split removes every known same-leaf duplicate, but 24% of images
-have no leaf-map entry and are treated as singletons. If two of those are secretly
-the same leaf, a little leakage survives.
-
-A frozen ImageNet embedding clusters by class, so "same leaf" and "different leaf,
-same class" both score high cosine -- the discriminating question is whether a
-test image is MORE similar to a train image than different leaves of the same class
-ever are. Calibration therefore uses two distributions: same-leaf pairs (positive)
-and different-leaf-same-class pairs (hard negative). The threshold is a high
-percentile of the negatives; a test image above it is more alike than same-class
-membership explains, i.e. a probable missed duplicate. If the two distributions do
-not separate, the method cannot bound residual leakage and says so.
-
-Usage:
-    python -m scripts.near_dup_check
-    python -m scripts.near_dup_check --limit 400
+ImageNet features cluster by class, so same-leaf and different-leaf-same-class pairs
+both score high cosine. The threshold is calibrated against those hard negatives; a
+test image counts as a probable missed duplicate only if it beats them.
 """
 
 import argparse

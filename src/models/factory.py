@@ -71,12 +71,8 @@ def freeze_backbone(model, name):
 
 
 def strip_head(model):
-    """Replace the final Linear with Identity, returning its input width.
-
-    Families disagree on head layout: resnet and regnet expose ``fc`` as a bare
-    Linear, convnext and efficientnet wrap one inside ``classifier``, densenet uses
-    a bare Linear there. Searching for the last Linear covers all of them.
-    """
+    """Replace the final Linear with Identity, returning its width. Searches for the
+    last Linear, since families vary (``fc`` vs a Linear inside ``classifier``)."""
     for attr in ("fc", "classifier", "head"):
         head = getattr(model, attr, None)
         if isinstance(head, nn.Linear):

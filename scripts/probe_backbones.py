@@ -1,18 +1,8 @@
-"""E24: how far does field accuracy track the frozen backbone alone?
+"""E24: does field accuracy track the frozen backbone across a ladder of CNNs?
 
-E15 showed that training 19,494 parameters and training 11.2M reach the same
-field accuracy, so whatever transfers is already in the pretrained features.
-This walks a ladder of frozen CNNs, moving one factor per rung -- capacity, then
-training recipe, then architecture generation, then pretraining data.
-
-Features are extracted once per backbone and the head is fitted on the cache,
-which is what makes five rungs affordable. That means no augmentation reaches
-the backbone, so this is a different protocol from the E15 frozen arms and
-ResNet-18 is re-run here to serve as the control under matched conditions.
-
-Usage:
-    python -m scripts.probe_backbones
-    python -m scripts.probe_backbones --backbones resnet18:IMAGENET1K_V1
+One factor per rung: capacity, training recipe, architecture, pretraining data.
+Features are cached (no augmentation reaches the backbone), so this is a different
+protocol from the E15 frozen arms; ResNet-18 is re-run here as the matched control.
 """
 
 import argparse

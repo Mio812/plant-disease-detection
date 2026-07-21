@@ -33,14 +33,9 @@ def confusion(y_true, y_pred, num_classes):
 
 
 def mcnemar(correct_a, correct_b):
-    """Exact McNemar test between two arms scored on the same images.
-
-    Arms evaluated on one dataset agree on most of it, so asking whether their
-    independent confidence intervals overlap throws the pairing away along with
-    most of the power. Only images where exactly one arm is right carry any
-    information about which is better, and the exact binomial over those needs no
-    large-sample approximation.
-    """
+    """Exact McNemar test between two arms scored on the same images. Only the
+    discordant pairs (one arm right, the other wrong) carry information; comparing
+    independent intervals would ignore the pairing and lose most of the power."""
     a = np.asarray(correct_a, dtype=bool)
     b = np.asarray(correct_b, dtype=bool)
     if a.shape != b.shape:

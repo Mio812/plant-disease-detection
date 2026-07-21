@@ -1,13 +1,10 @@
 """Train/validation/test split shared by every experiment.
 
-PlantVillage photographs each physical leaf many times, so a purely random split
-scatters near-duplicate images of one leaf across train, validation and test. The
-test score then partly measures recognition of leaves already seen in training.
-``leaf-map.json`` records which images share a leaf; the split keeps every image
-of a leaf on one side of the partition, so the held-out score reflects unseen
-leaves. Leaves are partitioned within each class, which also keeps the split
-stratified. Images with no recorded leaf are treated as their own singleton leaf:
-an image with no known duplicate cannot leak.
+PlantVillage photographs each leaf many times, so a random split leaks near-duplicate
+images of one leaf across train and test, inflating the held-out score. The split
+keeps every image of a leaf (from ``leaf-map.json``) on one side, partitioning leaves
+within each class so it stays stratified. An image with no recorded leaf is its own
+singleton -- with no known duplicate it cannot leak.
 """
 
 import json
@@ -34,12 +31,8 @@ def leaf_map_path(color_root):
 
 
 def leaf_groups(samples, labels, color_root):
-    """Group id per sample: the leaf it belongs to, or a unique singleton.
-
-    The id is scoped by class label. ``name_key`` can collide across classes, and
-    the split partitions leaves within each class, so a leaf is only ever meaningful
-    inside its own class; scoping keeps a collision from merging two leaves.
-    """
+    """Group id per sample: its leaf, or a unique singleton. Scoped by class label,
+    since ``name_key`` can collide across classes and would otherwise merge leaves."""
     path = leaf_map_path(color_root)
     leafmap = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     groups = []
@@ -50,12 +43,8 @@ def leaf_groups(samples, labels, color_root):
 
 
 def leaf_grouped_splits(seed, groups, labels, val_split, test_split):
-    """Partition leaves within each class, then place every image with its leaf.
-
-    Splitting per class keeps all 38 classes represented in every partition; a
-    class with at least three leaves is guaranteed at least one in validation and
-    one in test, so no class silently vanishes from the held-out sets.
-    """
+    """Partition each class's leaves, then place every image with its leaf, so all
+    classes stay represented and no leaf spans the partition."""
     rng = np.random.default_rng(seed)
     leaves_of_class = defaultdict(set)
     indices_of_leaf = defaultdict(list)

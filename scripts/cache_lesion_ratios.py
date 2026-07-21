@@ -1,16 +1,8 @@
-"""Cache the official-mask lesion ratio for every PlantVillage image.
+"""Cache the official-mask lesion ratio for every image, once.
 
-E25 regresses this from image features, so the target has to exist for the whole
-corpus rather than the 150-leaf sample E14 uses. Reading the segmented twin costs
-two decodes per image, which is why it is computed once and cached instead of
-being recomputed each epoch.
-
-Ratios come from the official segmented masks, never from Otsu -- the point of
-the arm is to learn what Otsu only approximates at inference.
-
-Usage:
-    python -m scripts.cache_lesion_ratios
-    python -m scripts.cache_lesion_ratios --limit 200      # smoke test
+E25's regression target, computed for the whole corpus. Ratios come from the
+official masks, never Otsu -- reading each segmented twin costs two decodes, hence
+the cache.
 """
 
 import argparse
