@@ -158,7 +158,7 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 | E11 | Few-shot fine-tune on PlantDoc train | supervised ceiling | **reported separately** — touches target labels | partial |
 | E12 | Leaf segmentation vs official masks (Dice) | H6 | official mask is ground truth | done |
 | E13 | Lesion ratio separates healthy vs diseased (ROC-AUC) | H6 | needs no manual labels | done |
-| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, two annotators; bands fixed to the rubric before grading | **done — weak.** Two graders agree at κ 0.72 (the ceiling); the lesion-ratio grade tracks them at only ρ 0.47 / κ 0.29, mis-calibrated at the healthy/mild boundary |
+| E14 | Ordinal grade vs manual annotation (ρ, MAE, κ) | H6 | 150 leaves, two annotators; bands fixed to the rubric before grading | **done.** Graders agree κ 0.72 (ceiling); rubric bands κ 0.29; bands recalibrated to grades lift it to **κ 0.42 (5-fold CV)** — moderate, still below ceiling. Healthy threshold moves 0.005→0.109: the mask overcounts severity at the low end |
 | E15 | Frozen backbone vs full fine-tune, crossed with `p ∈ {0.0, 0.7}` | H8 | 2x2 factorial: separates both main effects and their interaction | open |
 | E16 | Crop / disease / restricted decomposition of every 224 arm | H7 | scored on all 2,525 PlantDoc images, not the 236-image split | open |
 | E17 | Factorised crop-then-disease head | H9 | matched to E8 in every respect but the head | open |
