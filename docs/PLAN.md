@@ -43,7 +43,9 @@ needs), 20 epochs, 224px, severity_weight 10. ~50 min. Compare `within_class_rho
 to Otsu 0.78 and to E25's frozen probes (0.38 fine-tuned / 0.61 ImageNet) in
 `outputs/joint_severity.json`. If it beats 0.78, H17 confirmed and severity becomes a
 model output; if not, record it and Task 2 stands on the honest classical estimator.
-`severity_weight` may need a second value (try 5 and 20) if 10 under/over-weights.
+`severity_weight`: at 10 the severity term is only ~3% of the loss (sev_mse is
+inherently small on sqrt-ratio targets), so if within-class rho is weak, try
+*higher* (30, 50, 100), not lower.
 Also note `classification_accuracy` for any Task 1 trade-off.
 
 Then: report (.docx) and PPT, with PlantDoc/073 as the discussion-level extension.
