@@ -31,6 +31,21 @@ itself a finding and gets recorded.
 Leaky reference (to be replaced by honest numbers): ensemble 99.84 / binary 100.00;
 resnet18 arms 99.52 / 99.26 / 91.70 (frozen) / 99.24 (seg) / 98.48 (gray).
 
+## E26 landed (tonight) — strong, with two follow-ups
+
+Joint training clears the bar decisively: within-class rho 0.957 vs Otsu 0.78,
+classification 99.40%, no trade-off. H17 confirmed; Task 2 now has severity as a
+strong *model* output, not just a classical estimator beside it.
+
+Two honest follow-ups before it goes in the report as a headline:
+- **Save the checkpoint and validate against the E14 humans.** `train_joint.py`
+  saved metrics but not the model, so the 0.957 is only measured against the
+  official ratio it trained on. Add checkpoint saving, re-run (or reload), predict
+  severity for the 150 annotated leaves, and check it beats the classical estimator
+  on *human* agreement too, not just on reproducing the mask.
+- **Sanity-check the 0.957** — it is high; confirm the within-class computation and
+  eyeball a scatter of predicted vs official on a couple of classes.
+
 ## Tomorrow, first thing
 
 **E26 — joint training (H17).** Script built and CPU-verified (`scripts/train_joint.py`;
