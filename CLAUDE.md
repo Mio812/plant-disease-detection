@@ -40,7 +40,7 @@ plus a soft-voting **ensemble** whose weights are grid-searched on validation an
 never see test. Later arms add background randomisation, a frozen-backbone probe,
 and a factorised crop-then-disease head.
 
-**What the project actually argues.** Not "we got 99.8%". The argument is that
+**What the project actually argues.** Not "we got 99.5%". The argument is that
 **99.5% on PlantVillage is mostly capture bias** (and partly leaf-level train/test
 leakage), demonstrated with controls rather than asserted, and that the honest
 deployment story is a domain-adaptation one. Several probes agree, and the strongest
