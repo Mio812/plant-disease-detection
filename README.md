@@ -224,26 +224,22 @@ and the lesion-area fraction is bucketed into ordinal levels (`healthy`, `mild`,
 
 ## Results
 
-Test-set metrics (held-out 15%, 8,145 images; fixed seed → identical split for
-every model):
+Test-set metrics on the **leaf-grouped** split (held-out 15%, 8,215 images; no
+physical leaf shared with training — see *Test-set integrity* below):
 
 | Model         | Accuracy | Precision (macro) | Recall (macro) | F1 (macro) |
 | ------------- | -------- | ----------------- | -------------- | ---------- |
-| custom_cnn    | 0.9915   | 0.9901            | 0.9882         | 0.9891     |
-| resnet18      | 0.9974   | 0.9958            | 0.9948         | 0.9951     |
-| mobilenet_v2  | 0.9898   | 0.9867            | 0.9876         | 0.9870     |
-| **ensemble**  | **0.9984** | **0.9975**      | **0.9978**     | **0.9976** |
+| custom_cnn    | 0.9869   | 0.9843            | 0.9821         | 0.9831     |
+| resnet18      | 0.9933   | 0.9919            | 0.9922         | 0.9919     |
+| mobilenet_v2  | 0.9946   | 0.9903            | 0.9926         | 0.9914     |
+| **ensemble**  | **0.9953** | **0.9946**      | **0.9939**     | **0.9942** |
 
-**The ensemble wins.** All three backbones exceed 98.9% test accuracy; the from-scratch
-custom CNN (99.15%) trails pretrained ResNet-18 by only ~0.5% and edges out
-MobileNet-V2 — a small gap that reflects how separable PlantVillage is under
-controlled conditions. ResNet-18 misclassifies only 26 / 8,145 test images; 12 of
-those confuse Corn Cercospora/Gray leaf spot with Northern Leaf Blight (a known
-visual look-alike), and no error crosses the healthy/diseased boundary. Averaging the
-three baselines by a validation-tuned weighted vote lifts test accuracy to **99.84%** and cuts errors to
-**13 / 8,145** — the best result, again with no healthy/diseased crossing; ResNet-18
-(99.68%) remains the strongest  single model. Per-model training history, classification
-report, and confusion matrix are in `outputs/`.
+**The ensemble wins.** All three backbones exceed 98.6% test accuracy on unseen
+leaves. Averaging them by a validation-tuned weighted vote lifts accuracy to
+**99.53%** over the 38 specific-disease classes and **99.96%** on the healthy-vs-diseased
+task the brief names — with **39 / 8,215** errors, almost all within-crop disease
+look-alikes (e.g. Tomato early vs late blight) and **no** healthy/diseased crossing.
+Per-model history, classification report, and confusion matrix are in `outputs/`.
 
 Each non-default row is reproduced with (same config, model overridden):
 
@@ -252,13 +248,21 @@ uv run python -m scripts.train --model custom_cnn
 uv run python -m scripts.train --model mobilenet_v2
 ```
 
-## Reality check: is 99.8% real?
+## Reality check: is 99.5% real?
 
 High PlantVillage accuracy is largely an artefact of the benchmark rather than
-evidence of disease understanding. Four experiments quantify this.
+evidence of disease understanding. Several experiments quantify this.
+
+**0. Test-set integrity.** PlantVillage photographs each leaf several times, and its
+`leaf-map.json` records which images share a leaf. A naive random split leaks those
+near-duplicates: 74.7% of a random test split had a same-leaf twin in training. We
+split by *leaf* instead, so no leaf straddles the partition. This is the split used
+everywhere here; adopting it lowered the ensemble from a leaked 99.84% to an honest
+99.53%, and per disease it exposed Tomato early blight falling from a leaked 99% to
+an honest 91% — the one diagnostic weakness the leak had hidden.
 
 **1. The background alone predicts the label.** A logistic regression trained on
-**8 border pixels** — no leaf at all — reaches **31.6%** accuracy over 38 classes
+**8 border pixels** — no leaf at all — reaches **33.7%** accuracy over 38 classes
 (chance = 2.6%). The dataset carries capture bias correlated with the labels.
 
 **2. Removing the background collapses accuracy.** Re-scoring the same models on
@@ -266,10 +270,10 @@ the same leaves using PlantVillage's `segmented` variant:
 
 | Model         | Original | Background removed | Change |
 | ------------- | -------- | ------------------ | ------ |
-| custom_cnn    | 99.15%   | 32.42%             | −66.7  |
-| resnet18      | 99.74%   | 56.53%             | −43.2  |
-| mobilenet_v2  | 98.98%   | 62.41%             | −36.6  |
-| **ensemble**  | 99.84%   | **56.78%**         | −43.1  |
+| custom_cnn    | 98.69%   | 38.48%             | −60.2  |
+| resnet18      | 99.33%   | 69.57%             | −29.8  |
+| mobilenet_v2  | 99.46%   | 71.41%             | −28.1  |
+| **ensemble**  | 99.53%   | **70.05%**         | −29.5  |
 
 The from-scratch CNN degrades most and the ImageNet-pretrained backbones least,
 suggesting pretrained features attend more to the leaf and less to the backdrop.
@@ -280,33 +284,37 @@ in-the-wild images, 27 classes mapped to PlantVillage):
 
 | Model         | PlantVillage | PlantDoc (field) | Change |
 | ------------- | ------------ | ---------------- | ------ |
-| custom_cnn    | 99.15%       | 13.14%           | −86.0  |
-| resnet18      | 99.74%       | 16.10%           | −83.6  |
-| **ensemble**  | 99.84%       | **17.37%**       | −82.5  |
+| custom_cnn    | 98.69%       | 13.56%           | −85.1  |
+| resnet18      | 99.33%       | 14.41%           | −84.9  |
+| **ensemble**  | 99.53%       | **16.10%**       | −83.4  |
 
-Coarse signal survives — healthy-vs-diseased binary accuracy is still 80.9% —
+Coarse signal survives — healthy-vs-diseased binary accuracy is still 80.5% —
 but fine-grained disease identification does not transfer. Test-time fixes do
-not rescue it: hflip TTA adds +0.4 points and AdaBN *costs* 2.1, so the failure
-is a learned shortcut rather than a statistics shift.
+not rescue it, so the failure is a learned shortcut rather than a statistics
+shift. The bottleneck is crop identification (39.6% in the field), not diagnosis.
 
 **4. The model only partly looks at the leaf.** Grad-CAM mass falling inside the
-official leaf mask is **61.3%**, against a **47.5%** leaf-area baseline — a lift
-of only +13.8 points, so well over a third of the evidence is background.
+official leaf mask is **65.6%**, against a **49.6%** leaf-area baseline — a lift
+of only +16 points, so a third of the evidence is still background.
 
-**Severity.** Two checks, neither needing manual labels. The HSV leaf segmentation
-scored against the official masks gives Dice **0.80** mean / **0.87** median over
-300 images (9.0% below 0.5). The lesion ratio separates healthy from diseased
-leaves with **ROC-AUC 0.868** using the official masks versus **0.767** with Otsu
-segmentation, which is why the official masks are preferred; mean lesion ratio is
-0.039 on healthy leaves and 0.219 on diseased ones. `scripts.annotate` and
-`--probe severity-validate` additionally score the ordinal grade against manual
-annotations (Spearman, MAE, quadratic κ).
+**Severity (Task 2).** The lesion-area ratio separates healthy from diseased leaves
+with **ROC-AUC 0.868** using the official masks versus **0.767** with Otsu
+segmentation. Validated against **three human annotators** who graded 150 leaves
+(agreeing with each other at quadratic κ 0.63, the ceiling), the lesion-ratio grade
+tracks their consensus at κ 0.30, rising to **0.47** after cross-validated
+recalibration — a moderate proxy at ~74% of the human ceiling. Trained *jointly*
+with the classifier, a severity-regression head becomes a genuine model output:
+it reproduces the official mask almost perfectly (within-class ρ **0.957**) at no
+classification cost, and beats both classical estimators on human agreement (ρ 0.47
+vs Otsu 0.43). All lesion-area methods plateau near the human ceiling, because
+severity is more than lesion area — reported honestly rather than inflated.
 
 **Task 1 as the brief words it.** For "healthy vs diseased", the ensemble reaches
-**100.00%** on the held-out test split — none of its errors cross the
-healthy/diseased boundary. That figure falls to **90.2%** once the background is
-removed and to **80.9%** on field photographs, so even the coarse decision the
-brief asks for is partly propped up by the benchmark.
+**99.96%** on the held-out test split — no error crosses the healthy/diseased
+boundary. That figure falls to **80.5%** on field photographs, so even the coarse
+decision the brief asks for is partly propped up by the benchmark. The honest
+deployment path is domain adaptation: fine-tuning on field data recovers accuracy
+from 16.1% to **55.9%**.
 
 ## References
 

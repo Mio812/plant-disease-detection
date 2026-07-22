@@ -41,12 +41,13 @@ never see test. Later arms add background randomisation, a frozen-backbone probe
 and a factorised crop-then-disease head.
 
 **What the project actually argues.** Not "we got 99.8%". The argument is that
-**99.8% on PlantVillage is mostly capture bias**, demonstrated with controls rather
-than asserted, and that the honest deployment story is a domain-adaptation one.
-Four independent probes agree, and the strongest is a direct control: training only
-19,494 parameters (0.17% of the network) reaches 91.70% in the lab and the *same*
-24.15% in the field as training all 11.2M. The 7.8 lab points that full fine-tuning
-buys are worth nothing outside the benchmark.
+**99.5% on PlantVillage is mostly capture bias** (and partly leaf-level train/test
+leakage), demonstrated with controls rather than asserted, and that the honest
+deployment story is a domain-adaptation one. Several probes agree, and the strongest
+is a direct control: training only 19,494 parameters (0.17% of the network) reaches
+91.3% in the lab and *matches or beats* full fine-tuning in the field (16.9% vs
+15.2%). The ~8 lab points that updating all 11.2M parameters buys are worth nothing
+outside the benchmark.
 
 **Why PlantDoc is in a PlantVillage project.** Project 090 names PlantVillage and
 asks for classification plus severity. Its stated purpose — timely intervention by
