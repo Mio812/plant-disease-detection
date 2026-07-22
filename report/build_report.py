@@ -227,5 +227,7 @@ for ref in [
 ]:
     p(ref, size=9)
 
+doc.core_properties.author = "COMP9444 25T1 Project 090"
+doc.core_properties.title = "Automatic Plant Disease Detection Using Computer Vision"
 doc.save("report/COMP9444_Project_Report.docx")
 print("wrote report/COMP9444_Project_Report.docx")
