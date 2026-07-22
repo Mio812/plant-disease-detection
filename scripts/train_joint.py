@@ -170,7 +170,13 @@ def main():
     print(f"\n[E26] classification {class_acc:.2f}%   "
           f"within-class rho: head {fmt(rho_head)} vs Otsu {fmt(rho_otsu)}   (bar: beat Otsu)")
     Path(args.out).write_text(json.dumps(summary, indent=2), encoding="utf-8")
-    print(f"saved {args.out}")
+
+    torch.save({"model": model.state_dict(), "classes": classes}, Path(cfg.output_dir) / "joint_model.pth")
+    preds_out = [{"name": Path(p).name, "class": classes[l], "head": float(h),
+                  "official": float(o), "otsu": float(t)}
+                 for (p, l), h, o, t in zip(test_items, sev_out, official, otsu)]
+    (Path(cfg.output_dir) / "joint_predictions.json").write_text(json.dumps(preds_out), encoding="utf-8")
+    print(f"saved {args.out}, joint_model.pth, joint_predictions.json")
 
 
 if __name__ == "__main__":

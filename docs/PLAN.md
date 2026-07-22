@@ -31,20 +31,20 @@ itself a finding and gets recorded.
 Leaky reference (to be replaced by honest numbers): ensemble 99.84 / binary 100.00;
 resnet18 arms 99.52 / 99.26 / 91.70 (frozen) / 99.24 (seg) / 98.48 (gray).
 
-## E26 landed (tonight) — strong, with two follow-ups
+## E26 landed and is validated (tonight)
 
-Joint training clears the bar decisively: within-class rho 0.957 vs Otsu 0.78,
-classification 99.40%, no trade-off. H17 confirmed; Task 2 now has severity as a
-strong *model* output, not just a classical estimator beside it.
+Joint training makes severity a model output that reproduces the official mask
+near-perfectly (within-class rho 0.957, reproduced exactly on a second run,
+non-degenerate) at no classification cost (99.44%). The human cross-check is the
+honest headline: on the 20 graded leaves in E26's test split, the head agrees with
+human consensus at rho 0.47, beating Otsu 0.43 and the mask 0.41 — the best
+estimator we have and a model output, but lesion-area severity plateaus near human
+rho 0.47 because people grade by more than lesion area. n=20 is small, so the
+ordering is indicative.
 
-Two honest follow-ups before it goes in the report as a headline:
-- **Save the checkpoint and validate against the E14 humans.** `train_joint.py`
-  saved metrics but not the model, so the 0.957 is only measured against the
-  official ratio it trained on. Add checkpoint saving, re-run (or reload), predict
-  severity for the 150 annotated leaves, and check it beats the classical estimator
-  on *human* agreement too, not just on reproducing the mask.
-- **Sanity-check the 0.957** — it is high; confirm the within-class computation and
-  eyeball a scatter of predicted vs official on a couple of classes.
+Report framing: E26 satisfies "expand the model" (severity is now a network output,
+best-in-class, no mask at inference), reported honestly with the human ceiling.
+Artifacts: outputs/joint_model.pth, joint_predictions.json, joint_severity.json.
 
 ## Tomorrow, first thing
 
