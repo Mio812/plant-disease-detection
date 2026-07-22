@@ -31,10 +31,10 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H2 | Much of that accuracy comes from capture bias in the background, not from leaf pathology. | confirmed |
 | H3 | Accuracy therefore collapses on real field photographs. | confirmed |
 | H4 | The collapse is a *learned shortcut*, not a test-time statistics shift, so test-time fixes will not repair it. | confirmed |
-| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **confirmed** — McNemar on 2,525: +41 of 179 discordant, p = 0.0027; crop +73 of 319, p = 5.2e-05. Earlier recorded as null on an underpowered n = 236 reading |
+| H5 | Removing the shortcut during training improves field transfer, at a small cost in lab accuracy. | **confirmed on crop, mixed elsewhere** — honest McNemar (2,525): crop +62/360 p = 0.0013, 38-way +39/241 p = 0.014, but binary *worse* −55/283 p = 0.0013. Background randomisation helps species/fine discrimination and hurts healthy-vs-diseased |
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
-| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **confirmed** — McNemar at `p = 0.0`: 38-way p = 0.0012, crop p = 2.1e-08, binary p = 1.6e-04; the crop and binary effects hold at `p = 0.7` too. The earlier "tie" was an underpowered n = 236 reading |
+| H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **confirmed, localised to binary** — honest McNemar: freezing gives binary +105/479 p = 1.8e-6 at `p = 0.7`; the crop/38-way effect is only marginal (p = 0.04–0.12). The leaky split overstated it (crop had read p = 2e-8) because the leaky full fine-tune was more overfit to memorised leaves |
 | H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **magnitude rejected, mechanism unproven** — crop rose 36.99 → 38.73, p = 0.014 raw, which does **not** survive correction for the 12 paired tests run; 38-way p = 0.10. Nowhere near the ~60% predicted, and below simply freezing the backbone (40.12) |
 | H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
 | H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | open |
@@ -245,8 +245,8 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 
 | Deliverable | Covered by |
 |-------------|-----------|
-| Brief Task 1 — healthy/diseased classification | E1, E2 (binary accuracy 100.00%) |
-| Brief Task 2 — severity from image features | E12, E13, E14 |
+| Brief Task 1 — healthy/diseased classification | E1, E2 (binary 99.96%, 38-way specific disease 99.53%) |
+| Brief Task 2 — severity from image features | E12, E13, E14, and E25/E26 (severity as a model output) |
 | Brief — colour, grayscale and segmented variants | E10, E9, E4 |
 | Rubric — Exploratory analysis (3) | E3, class distribution, severity distributions |
 | Rubric — Models and methods (3) | E1, E2, E8, E9, E10 |
@@ -262,9 +262,9 @@ recorded here so coverage is traceable rather than incidental.
 
 | Requirement | Met by | Evidence |
 |---|---|---|
-| Accuracy improvement over baseline methods (>31%) | E11 / E18, full-data adaptation | 17.37 → 55.93 = **+38.56 pp** over the baseline ensemble; **+31.78 pp** against the adapted arm's own zero-shot. Both n = 236 |
-| Robustness to lighting, growth stage and symptom variation | E21, with E8 supplying the mechanism and E10 bounding the colour dependence | open — E21 |
-| Lightweight enough for mobile or edge deployment | E15 with the efficiency probe | a frozen backbone plus a 19,494-parameter head is **78 KB per crop** against a 44.9 MB model, at no measured field cost (24.15% either way) |
+| Accuracy improvement over baseline methods (>31%) | E11 / E18, full-data adaptation | 16.10 → 55.93 = **+39.83 pp** over the baseline ensemble zero-shot; +30.93 pp against the strongest arm's own zero-shot. Both n = 236, honest split |
+| Robustness to lighting, growth stage and symptom variation | E8 (mechanism), E10 (colour dependence); E21 stratification optional | E8 background randomisation helps field crop id (McNemar p = 0.0013); grayscale collapses in the field, so colour carries real field signal |
+| Lightweight enough for mobile or edge deployment | E15 with the efficiency probe | a frozen backbone plus a 19,494-parameter head is **78 KB per crop** against a 44.9 MB model, at no field cost — frozen field 16.9–18.1% vs full fine-tune 15.2–16.7% |
 
 Two qualifications. The source paper's own wording is an *increase in classification
 accuracy*, and its baseline is a model trained on PlantVillage and tested on
