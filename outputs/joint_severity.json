@@ -1,0 +1,10 @@
+{
+  "augment": "standard",
+  "severity_weight": 10.0,
+  "classification_accuracy": 99.44,
+  "within_class_rho_head": 0.9566,
+  "within_class_rho_otsu": 0.7843,
+  "within_class_n_classes": 37,
+  "auc_head": 0.8253,
+  "auc_otsu": 0.7356
+}

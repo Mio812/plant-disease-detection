@@ -1,0 +1,17 @@
+{
+  "checkpoint": "outputs/resnet18_color_strong_p70_224_best.pth",
+  "feature_dim": 512,
+  "head_parameters": 513,
+  "n_test": 8215,
+  "within_class_rho_head": 0.3803,
+  "within_class_rho_otsu": 0.7843,
+  "within_class_n_classes": 37,
+  "val_mse_sqrt_ratio": 0.022772,
+  "auc_predicted": 0.9364,
+  "auc_official_mask": 0.8145,
+  "auc_otsu_mask": 0.7356,
+  "spearman_vs_official": 0.7261,
+  "spearman_otsu_vs_official": 0.8678,
+  "mae_vs_official": 0.0912,
+  "mae_otsu_vs_official": 0.0482
+}

@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "open_38way": 16.1,
+    "closed_27way": 19.92
+  },
+  "+TTA": {
+    "open_38way": 15.68,
+    "closed_27way": 19.49
+  },
+  "+AdaBN": {
+    "open_38way": 15.25,
+    "closed_27way": 17.37
+  },
+  "+AdaBN +TTA": {
+    "open_38way": 15.68,
+    "closed_27way": 19.07
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "custom_cnn": 38.48,
+  "resnet18": 69.57,
+  "mobilenet_v2": 71.41,
+  "ensemble": 70.05,
+  "ensemble_binary": 94.08,
+  "ensemble_crop": 82.11,
+  "ensemble_disease_given_crop": 85.32,
+  "n_crops": 14,
+  "n_images": 8215,
+  "dataset": "segmented"
+}

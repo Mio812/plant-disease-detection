@@ -1,0 +1,56 @@
+{
+  "luminance": {
+    "strong aug (bg-random)": {
+      "per_bin_accuracy": [
+        16.36,
+        17.21,
+        16.73
+      ],
+      "high_minus_low": 0.37
+    },
+    "standard aug (baseline)": {
+      "per_bin_accuracy": [
+        12.0,
+        13.21,
+        11.88
+      ],
+      "high_minus_low": -0.12
+    }
+  },
+  "contrast": {
+    "strong aug (bg-random)": {
+      "per_bin_accuracy": [
+        16.97,
+        17.33,
+        16.0
+      ],
+      "high_minus_low": -0.97
+    },
+    "standard aug (baseline)": {
+      "per_bin_accuracy": [
+        13.45,
+        11.76,
+        11.88
+      ],
+      "high_minus_low": -1.57
+    }
+  },
+  "sharpness": {
+    "strong aug (bg-random)": {
+      "per_bin_accuracy": [
+        14.06,
+        18.45,
+        17.8
+      ],
+      "high_minus_low": 3.74
+    },
+    "standard aug (baseline)": {
+      "per_bin_accuracy": [
+        12.24,
+        12.5,
+        12.35
+      ],
+      "high_minus_low": 0.11
+    }
+  }
+}

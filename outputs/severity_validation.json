@@ -1,0 +1,23 @@
+{
+  "n_graded": 150,
+  "annotators": 3,
+  "spearman_rho": 0.46361365341566846,
+  "spearman_p": 2.305804765696831e-09,
+  "quadratic_kappa": 0.2999475616151023,
+  "mae_levels": 1.0066666666666666,
+  "inter_annotator_kappa_mean_pairwise": 0.6343093661564904,
+  "inter_annotator_pairwise": {
+    "A_B": 0.7243532560214094,
+    "A_C": 0.5388519787067223,
+    "B_C": 0.6397228637413395
+  },
+  "all_three_exact_agree": 0.29333333333333333,
+  "recalibrated_thresholds": [
+    0.0578,
+    0.1842,
+    0.3577
+  ],
+  "quadratic_kappa_recalibrated_cv": 0.47239143250147386,
+  "quadratic_kappa_recalibrated_insample": 0.5121230041395624,
+  "quadratic_kappa_uncalibrated": 0.29994756161510217
+}

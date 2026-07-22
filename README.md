@@ -79,6 +79,28 @@ Folders are named `Crop___Condition` (e.g. `Tomato___Late_blight`) and are loade
 with `torchvision.datasets.ImageFolder`. After download, the colour images sit at
 `data/PlantVillage/raw/color`, which is the default `data.root`.
 
+[PlantDoc](https://github.com/pratikkayal/PlantDoc-Dataset) — 2,525 in-the-wild
+field photographs used **only** for external validation; never trained on.
+
+## Reproducibility and data provenance
+
+Every number in the report, notebook, and README is traceable, not asserted:
+
+- **Datasets are public and cited**, not ours: PlantVillage (Hughes & Salathé /
+  Mohanty et al.) and PlantDoc (Singh et al.). `scripts.prepare_data` downloads both;
+  they are gitignored only because of size, and their sources are linked above.
+- **Every result is reproducible** from a single fixed seed and one shared 70/15/15
+  split. `uv run python -m scripts.run_all` regenerates the full experiment matrix.
+- **The raw result artefacts are committed** under `outputs/*.json` (50 files — every
+  evaluation, probe, and audit that backs a reported number) and `outputs/*.txt`
+  (per-class classification reports). Trained checkpoints (~696 MB) are omitted for
+  size but regenerate deterministically from the seed.
+- **The notebook carries embedded outputs**, so all results are visible without
+  re-running anything.
+- **The 150 human severity grades** (three annotators) — the only primary data we
+  produced — are committed under `outputs/annotation/` alongside the grading tool
+  and instructions, so `--probe severity-validate` is fully reproducible.
+
 ## Setup with uv on Windows
 
 The project is managed with [uv](https://docs.astral.sh/uv/). These steps target

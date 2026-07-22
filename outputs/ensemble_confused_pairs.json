@@ -1,0 +1,90 @@
+{
+  "total_errors": 38,
+  "pairs": [
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Late_blight",
+      "count": 6
+    },
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Septoria_leaf_spot",
+      "count": 6
+    },
+    {
+      "true": "Corn_(maize)___Northern_Leaf_Blight",
+      "pred": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "count": 5
+    },
+    {
+      "true": "Cherry_(including_sour)___healthy",
+      "pred": "Soybean___healthy",
+      "count": 3
+    },
+    {
+      "true": "Tomato___Late_blight",
+      "pred": "Tomato___Early_blight",
+      "count": 3
+    },
+    {
+      "true": "Tomato___Bacterial_spot",
+      "pred": "Tomato___Target_Spot",
+      "count": 2
+    },
+    {
+      "true": "Tomato___Bacterial_spot",
+      "pred": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+      "count": 2
+    },
+    {
+      "true": "Tomato___Target_Spot",
+      "pred": "Tomato___Spider_mites Two-spotted_spider_mite",
+      "count": 2
+    },
+    {
+      "true": "Apple___Apple_scab",
+      "pred": "Tomato___Leaf_Mold",
+      "count": 1
+    },
+    {
+      "true": "Cherry_(including_sour)___healthy",
+      "pred": "Squash___Powdery_mildew",
+      "count": 1
+    },
+    {
+      "true": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "pred": "Corn_(maize)___Northern_Leaf_Blight",
+      "count": 1
+    },
+    {
+      "true": "Strawberry___Leaf_scorch",
+      "pred": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Bacterial_spot",
+      "pred": "Peach___Bacterial_spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Target_Spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Late_blight",
+      "pred": "Tomato___healthy",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Target_Spot",
+      "pred": "Tomato___Early_blight",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+      "pred": "Tomato___Leaf_Mold",
+      "count": 1
+    }
+  ]
+}

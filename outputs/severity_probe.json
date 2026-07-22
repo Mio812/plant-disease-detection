@@ -1,0 +1,16 @@
+{
+  "n": 300,
+  "auc_otsu_mask": 0.7670222222222223,
+  "auc_official_mask": 0.8676444444444444,
+  "mean_ratio_healthy_official": 0.03923437224049872,
+  "mean_ratio_diseased_official": 0.21882972705721804,
+  "diseased_grade_distribution": {
+    "healthy": 0,
+    "mild": 36,
+    "moderate": 65,
+    "severe": 49
+  },
+  "leaf_segmentation_dice_mean": 0.796947898892748,
+  "leaf_segmentation_dice_median": 0.8668691074998545,
+  "leaf_segmentation_dice_below_0.5": 0.09
+}

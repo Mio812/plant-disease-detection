@@ -1,0 +1,11 @@
+{
+  "n_test": 8215,
+  "threshold": 0.9365,
+  "neg_percentile": 99.9,
+  "same_leaf_median_sim": 0.8621,
+  "diff_leaf_same_class_median_sim": 0.7521,
+  "separation": 0.1099,
+  "true_duplicate_recall_at_threshold": 0.0439,
+  "test_flagged": 877,
+  "test_flagged_pct": 10.68
+}

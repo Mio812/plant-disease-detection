@@ -1,0 +1,110 @@
+{
+  "total_errors": 39,
+  "pairs": [
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Late_blight",
+      "count": 6
+    },
+    {
+      "true": "Corn_(maize)___Northern_Leaf_Blight",
+      "pred": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "count": 5
+    },
+    {
+      "true": "Tomato___Late_blight",
+      "pred": "Tomato___Early_blight",
+      "count": 5
+    },
+    {
+      "true": "Cherry_(including_sour)___healthy",
+      "pred": "Soybean___healthy",
+      "count": 3
+    },
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Septoria_leaf_spot",
+      "count": 3
+    },
+    {
+      "true": "Tomato___Target_Spot",
+      "pred": "Tomato___Spider_mites Two-spotted_spider_mite",
+      "count": 2
+    },
+    {
+      "true": "Cherry_(including_sour)___healthy",
+      "pred": "Grape___Leaf_blight_(Isariopsis_Leaf_Spot)",
+      "count": 1
+    },
+    {
+      "true": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "pred": "Corn_(maize)___Northern_Leaf_Blight",
+      "count": 1
+    },
+    {
+      "true": "Pepper,_bell___Bacterial_spot",
+      "pred": "Tomato___Septoria_leaf_spot",
+      "count": 1
+    },
+    {
+      "true": "Strawberry___Leaf_scorch",
+      "pred": "Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Bacterial_spot",
+      "pred": "Tomato___Target_Spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Bacterial_spot",
+      "pred": "Tomato___healthy",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Spider_mites Two-spotted_spider_mite",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Early_blight",
+      "pred": "Tomato___Target_Spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Late_blight",
+      "pred": "Tomato___Leaf_Mold",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Late_blight",
+      "pred": "Tomato___healthy",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Target_Spot",
+      "pred": "Tomato___Early_blight",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Target_Spot",
+      "pred": "Tomato___Septoria_leaf_spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+      "pred": "Tomato___Bacterial_spot",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+      "pred": "Tomato___Leaf_Mold",
+      "count": 1
+    },
+    {
+      "true": "Tomato___Tomato_Yellow_Leaf_Curl_Virus",
+      "pred": "Tomato___Spider_mites Two-spotted_spider_mite",
+      "count": 1
+    }
+  ]
+}

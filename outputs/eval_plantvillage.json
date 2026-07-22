@@ -1,0 +1,18 @@
+{
+  "custom_cnn": 98.69,
+  "resnet18": 99.33,
+  "mobilenet_v2": 99.46,
+  "ensemble": 99.53,
+  "ensemble_binary": 99.96,
+  "ensemble_crop": 99.93,
+  "ensemble_disease_given_crop": 99.6,
+  "n_crops": 14,
+  "n_images": 8215,
+  "dataset": "plantvillage",
+  "metrics": {
+    "accuracy": 0.9952525867315886,
+    "precision_macro": 0.994154391009213,
+    "recall_macro": 0.9942570614453281,
+    "f1_macro": 0.9941544798143553
+  }
+}

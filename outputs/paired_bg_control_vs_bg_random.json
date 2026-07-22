@@ -1,0 +1,35 @@
+{
+  "arm_a": "bg_control",
+  "arm_b": "bg_random",
+  "n": 2525,
+  "all_38": {
+    "n": 2525,
+    "accuracy_a": 15.17,
+    "accuracy_b": 16.71,
+    "only_a_correct": 101,
+    "only_b_correct": 140,
+    "discordant": 241,
+    "net_gain_b": 39,
+    "p_value": 0.014204262213416814
+  },
+  "crop": {
+    "n": 2525,
+    "accuracy_a": 37.19,
+    "accuracy_b": 39.64,
+    "only_a_correct": 149,
+    "only_b_correct": 211,
+    "discordant": 360,
+    "net_gain_b": 62,
+    "p_value": 0.0012729800620266416
+  },
+  "binary": {
+    "n": 2525,
+    "accuracy_a": 73.23,
+    "accuracy_b": 71.05,
+    "only_a_correct": 169,
+    "only_b_correct": 114,
+    "discordant": 283,
+    "net_gain_b": -55,
+    "p_value": 0.001286934912259999
+  }
+}

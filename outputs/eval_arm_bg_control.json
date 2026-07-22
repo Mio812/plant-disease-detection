@@ -1,0 +1,12 @@
+{
+  "resnet18": 15.17,
+  "ensemble": 15.17,
+  "ensemble_binary": 73.23,
+  "ensemble_crop": 37.19,
+  "ensemble_disease_given_crop": 40.79,
+  "n_crops": 14,
+  "ensemble_restricted": 18.22,
+  "n_classes_possible": 27,
+  "n_images": 2525,
+  "dataset": "plantdoc"
+}

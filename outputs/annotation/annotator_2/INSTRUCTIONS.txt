@@ -1,0 +1,30 @@
+Severity grading - COMP9444 Project 090
+=======================================
+
+EASIEST WAY: double-click `grade.html`. It shows one leaf at a time and you
+press 0-3. Nothing to install, progress is saved automatically.
+
+You are grading how much of the LEAF AREA shows disease symptoms (lesions,
+spots, discolouration, necrosis).
+
+The file names are dataset ids - they are meant to look meaningless, and the
+disease name is deliberately hidden so your judgement is not biased. Just look
+at the leaf.
+
+If you prefer the spreadsheet, write one number in the `manual_grade` column:
+
+    0 = healthy     no visible symptoms
+    1 = mild        symptoms on roughly < 5% of the leaf
+    2 = moderate    roughly 5-20% of the leaf
+    3 = severe      more than about 20% of the leaf
+
+Guidance
+- Judge the proportion of the LEAF, not the whole image.
+- Ignore the background entirely.
+- These are all leaves the classifier called diseased, so 0 is possible but
+  should be uncommon - use it when you genuinely see no symptoms.
+- If you cannot tell, leave the cell empty rather than guessing.
+- Do not change any other column, and do not rename files.
+- The rows are in no particular order; grade each image on its own.
+
+Send grades.csv back when done.

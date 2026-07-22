@@ -1,0 +1,35 @@
+{
+  "arm_a": "bg_control",
+  "arm_b": "frozen_ctrl",
+  "n": 2525,
+  "all_38": {
+    "n": 2525,
+    "accuracy_a": 15.17,
+    "accuracy_b": 16.91,
+    "only_a_correct": 193,
+    "only_b_correct": 237,
+    "discordant": 430,
+    "net_gain_b": 44,
+    "p_value": 0.03798892229464509
+  },
+  "crop": {
+    "n": 2525,
+    "accuracy_a": 37.19,
+    "accuracy_b": 39.37,
+    "only_a_correct": 326,
+    "only_b_correct": 381,
+    "discordant": 707,
+    "net_gain_b": 55,
+    "p_value": 0.042191309125592866
+  },
+  "binary": {
+    "n": 2525,
+    "accuracy_a": 73.23,
+    "accuracy_b": 73.31,
+    "only_a_correct": 261,
+    "only_b_correct": 263,
+    "discordant": 524,
+    "net_gain_b": 2,
+    "p_value": 0.9651608767986927
+  }
+}

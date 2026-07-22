@@ -1,0 +1,14 @@
+{
+  "custom_cnn": 10.69,
+  "resnet18": 12.28,
+  "mobilenet_v2": 14.97,
+  "ensemble": 13.94,
+  "ensemble_binary": 73.47,
+  "ensemble_crop": 34.5,
+  "ensemble_disease_given_crop": 40.41,
+  "n_crops": 14,
+  "ensemble_restricted": 15.8,
+  "n_classes_possible": 27,
+  "n_images": 2525,
+  "dataset": "plantdoc"
+}

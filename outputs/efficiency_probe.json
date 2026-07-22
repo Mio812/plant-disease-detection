@@ -1,0 +1,22 @@
+{
+  "custom_cnn": {
+    "parameters_M": 0.4,
+    "checkpoint_MB": 1.6,
+    "latency_ms": 0.4,
+    "throughput_img_s": 2469.5
+  },
+  "resnet18": {
+    "parameters_M": 11.2,
+    "checkpoint_MB": 44.9,
+    "latency_ms": 1.4,
+    "throughput_img_s": 714.8
+  },
+  "mobilenet_v2": {
+    "parameters_M": 2.27,
+    "checkpoint_MB": 9.3,
+    "latency_ms": 2.68,
+    "throughput_img_s": 373.4
+  },
+  "device": "cuda",
+  "image_size": 128
+}

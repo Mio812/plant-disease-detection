@@ -1,0 +1,67 @@
+{
+  "shots": 100,
+  "before": 25.0,
+  "best": 55.50847457627118,
+  "history": [
+    {
+      "epoch": 1,
+      "plantdoc_accuracy": 41.101694915254235
+    },
+    {
+      "epoch": 2,
+      "plantdoc_accuracy": 47.03389830508475
+    },
+    {
+      "epoch": 3,
+      "plantdoc_accuracy": 50.0
+    },
+    {
+      "epoch": 4,
+      "plantdoc_accuracy": 50.0
+    },
+    {
+      "epoch": 5,
+      "plantdoc_accuracy": 50.847457627118644
+    },
+    {
+      "epoch": 6,
+      "plantdoc_accuracy": 50.847457627118644
+    },
+    {
+      "epoch": 7,
+      "plantdoc_accuracy": 54.23728813559322
+    },
+    {
+      "epoch": 8,
+      "plantdoc_accuracy": 55.08474576271186
+    },
+    {
+      "epoch": 9,
+      "plantdoc_accuracy": 55.08474576271186
+    },
+    {
+      "epoch": 10,
+      "plantdoc_accuracy": 55.08474576271186
+    },
+    {
+      "epoch": 11,
+      "plantdoc_accuracy": 55.50847457627118
+    },
+    {
+      "epoch": 12,
+      "plantdoc_accuracy": 54.23728813559322
+    },
+    {
+      "epoch": 13,
+      "plantdoc_accuracy": 53.813559322033896
+    },
+    {
+      "epoch": 14,
+      "plantdoc_accuracy": 54.66101694915254
+    },
+    {
+      "epoch": 15,
+      "plantdoc_accuracy": 55.50847457627118
+    }
+  ]
+}

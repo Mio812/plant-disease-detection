@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Severity grading</title>
+<style>
+ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#14200f;color:#eef3e8;
+      display:flex;flex-direction:column;align-items:center;min-height:100vh}
+ header{width:100%;background:#1e3318;padding:10px 18px;box-sizing:border-box}
+ h1{font-size:16px;margin:0 0 6px}
+ #bar{height:6px;background:#33502a;border-radius:3px;overflow:hidden}
+ #fill{height:100%;width:0;background:#8FB55E;transition:width .2s}
+ #meta{font-size:13px;color:#b9cfa8;margin-top:6px}
+ img{max-width:min(70vw,560px);max-height:56vh;border-radius:8px;margin:14px 0;background:#000}
+ .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+ button{font-size:15px;padding:10px 16px;border:0;border-radius:8px;cursor:pointer;background:#2C5F2D;color:#fff}
+ button:hover{background:#3d7a3e}
+ button.skip{background:#5a5a5a}
+ button.done{background:#C9A227;color:#1b1b1b;font-weight:600}
+ .hint{font-size:12.5px;color:#9db98c;margin:10px 0 4px;text-align:center;line-height:1.6}
+ textarea{width:min(90vw,760px);height:180px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+</style></head><body>
+<header>
+ <h1>Severity grading &mdash; annotator_4</h1>
+ <div id="bar"><div id="fill"></div></div>
+ <div id="meta"></div>
+</header>
+<img id="pic" alt="(image failed to load)" onerror="document.getElementById('meta').textContent='Could not load '+IMAGES[i]+' - is the images folder next to this file?'">
+<div class="hint">
+ How much of the <b>LEAF</b> shows disease symptoms? Ignore the background.<br>
+ <b>0</b> none &nbsp;|&nbsp; <b>1</b> mild, under 5% &nbsp;|&nbsp; <b>2</b> moderate, 5&ndash;20% &nbsp;|&nbsp;
+ <b>3</b> severe, over 20% &nbsp;|&nbsp; <b>S</b> skip if unsure
+</div>
+<div class="btns">
+ <button onclick="grade(0)">0 &middot; none</button>
+ <button onclick="grade(1)">1 &middot; mild</button>
+ <button onclick="grade(2)">2 &middot; moderate</button>
+ <button onclick="grade(3)">3 &middot; severe</button>
+ <button class="skip" onclick="grade('')">S &middot; skip</button>
+ <button class="skip" onclick="back()">&larr; undo</button>
+</div>
+<div class="btns" style="margin-top:12px">
+ <button class="done" onclick="finish()">Show my grades.csv</button>
+</div>
+<textarea id="out" style="display:none" readonly></textarea>
+<script>
+const IMAGES=["fc0cec90-4a1e-4cdc-95cf-a34abc1dc8c9___GHLB2 Leaf 117.2.jpg", "9c96bbe3-5599-4e31-996f-ae37d75872f5___PSU_CG 2215.jpg", "RS_Rust 2650.jpg", "6797ee0c-20a8-4a39-ab57-f65eb9c57885___RS_Erly.B 7647.jpg", "366e550d-8604-44cd-b239-325d9e14a4f4___RS_Erly.B 6378.jpg", "86965ac5-b790-4218-a3c6-216d10da5211___PSU_CG 2066.jpg", "2a70c9e6-2c2f-4355-94fb-02afc8141be5___Com.G_SpM_FL 8877.jpg", "37c875ff-bb1a-4efd-b65a-9e4aa6bed2a6___UF.GRC_YLCV_Lab 09463.jpg", "e565cdd1-9488-4eaf-976b-a68c566087e8___Rut._Bact.S 0991.jpg", "819a918b-6982-4840-87aa-8bce089575b0___UF.GRC_YLCV_Lab 01839.jpg", "39c257ad-8334-45e7-a4e1-f131bb4a7eee___JR_FrgE.S 3023.jpg", "c52f348c-1da2-4455-afcb-a99c0cd32c51___FAM_B.Msls 4210.jpg", "4fea7725-bb98-4e06-a8c4-764e66c809ac___YLCV_GCREC 1966.jpg", "c66fe682-9e42-4343-a4d4-add4d6244859___NREC_B.Spot 9131.jpg", "ad5d1c57-162e-49ea-868e-efde59603115___RS_L.Scorch 1401.jpg", "a2027312-f55d-4e37-8f96-1dd323ae2336___FAM_B.Msls 4095.jpg", "8aab9abd-f5e3-4653-80d9-317bef625ae2___RS_LB 5221.jpg", "d76eb906-9957-4572-bf7f-60936f30f8f3___Crnl_L.Mold 8640.jpg", "457acd3d-13b8-49ee-9958-6d2a330f11f5___UF.Citrus_HLB_Lab 0370.jpg", "a4880706-e191-43ff-a5a7-bd0f0c03aa2d___Keller.St_CG 1851.jpg", "5dbcba87-93fa-4c21-8abd-bc20c93b359f___FREC_Scab 3258.jpg", "8a30d4c5-0065-4981-aee2-2f4cb7ac22ae___NREC_B.Spot 1887.jpg", "887c5359-fb30-4e3a-86cd-d35bca0699eb___Com.G_TgS_FL 7991.jpg", "80b5095a-7f0e-45e8-841d-173f77a3b623___CREC_HLB 3928.jpg", "dbd393bd-b5db-4edc-a416-a52ac8b37b7c___Com.G_TgS_FL 8201.jpg", "61cfe32d-d9cd-4ee4-a8db-5da174570897___FAM_B.Msls 4074.jpg", "dc289122-aa0d-454b-b617-16824440fce4___RS_LB 2959.jpg", "dbb50cba-a410-49af-a95f-ac53d5fc9af3___Com.G_TgS_FL 8295.jpg", "be4476a9-c03a-4166-bd89-fd39ec64a3e9___CREC_HLB 4574.jpg", "e277b59d-2e55-4117-92c7-93996599ef02___GCREC_Bact.Sp 3168.jpg", "4fd2b622-36f6-454c-ba76-d5e89a2280d1___CREC_HLB 4277.jpg", "579ba9c1-f11d-46db-9280-35b7c8b99109___UF.GRC_YLCV_Lab 02649.jpg", "3b8ea861-6f50-4e0e-b3a3-7360e47c2d47___UF.GRC_YLCV_Lab 01680.jpg", "0ea78733-9404-4536-8793-a108c66269b3___FREC_Scab 3145.jpg", "d92e1697-73e6-4acd-aab7-53e0037c7bed___MD_Powd.M 0574.jpg", "f7b7b4c8-1420-4ffe-ba64-97be026edeb4___Com.G_SpM_FL 8978.jpg"], KEY="grades_annotator_4";
+let g=JSON.parse(localStorage.getItem(KEY)||"{}"), i=0;
+function firstUngraded(){for(let k=0;k<IMAGES.length;k++)if(!(IMAGES[k] in g))return k;return IMAGES.length;}
+function show(){
+  i=Math.min(i,IMAGES.length-1);
+  const done=Object.keys(g).length;
+  document.getElementById("fill").style.width=(100*done/IMAGES.length)+"%";
+  document.getElementById("meta").textContent=`${done} / ${IMAGES.length} graded  -  now showing #${i+1}: ${IMAGES[i]}`;
+  document.getElementById("pic").src="images/"+encodeURIComponent(IMAGES[i]);
+}
+function grade(v){g[IMAGES[i]]=v;localStorage.setItem(KEY,JSON.stringify(g));i=firstUngraded();
+  if(i>=IMAGES.length){finish();}else{show();}}
+function back(){i=Math.max(0,i-1);delete g[IMAGES[i]];localStorage.setItem(KEY,JSON.stringify(g));show();}
+function finish(){
+  let csv="image,manual_grade\n";
+  IMAGES.forEach(n=>{csv+=n+","+(n in g?g[n]:"")+"\n";});
+  const t=document.getElementById("out");t.style.display="block";t.value=csv;t.select();
+  document.getElementById("meta").textContent="Done. Copy the text below into grades.csv, or save it as grades.csv.";
+}
+document.addEventListener("keydown",e=>{
+  if(["0","1","2","3"].includes(e.key))grade(parseInt(e.key));
+  else if(e.key.toLowerCase()==="s")grade("");
+  else if(e.key==="Backspace")back();});
+i=firstUngraded();show();
+</script></body></html>

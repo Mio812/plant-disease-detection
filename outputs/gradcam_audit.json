@@ -1,0 +1,7 @@
+{
+  "model": "resnet18",
+  "n": 60,
+  "mean_attention_in_leaf": 0.656254190425822,
+  "mean_leaf_area_fraction": 0.4960988362630208,
+  "attention_lift_over_area": 0.1601553541628012
+}

@@ -8,10 +8,20 @@ __pycache__/
 venv/
 env/
 
-# Data and artifacts
+# Raw datasets: public, downloaded via scripts/prepare_data.py (see README)
 /data/
+
+# Outputs: track the result artifacts (evidence for every reported number) but not
+# the 696 MB of checkpoints (regenerable) or the regenerable annotation image copies.
 outputs/*
 !outputs/.gitkeep
+!outputs/*.json
+!outputs/*.txt
+!outputs/*.png
+!outputs/annotation
+outputs/annotation/*/images/
+outputs/annotation/*.zip
+
 outputs_leaky/
 outputs_quick/
 *.pth

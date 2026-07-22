@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Severity grading</title>
+<style>
+ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#14200f;color:#eef3e8;
+      display:flex;flex-direction:column;align-items:center;min-height:100vh}
+ header{width:100%;background:#1e3318;padding:10px 18px;box-sizing:border-box}
+ h1{font-size:16px;margin:0 0 6px}
+ #bar{height:6px;background:#33502a;border-radius:3px;overflow:hidden}
+ #fill{height:100%;width:0;background:#8FB55E;transition:width .2s}
+ #meta{font-size:13px;color:#b9cfa8;margin-top:6px}
+ img{max-width:min(70vw,560px);max-height:56vh;border-radius:8px;margin:14px 0;background:#000}
+ .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+ button{font-size:15px;padding:10px 16px;border:0;border-radius:8px;cursor:pointer;background:#2C5F2D;color:#fff}
+ button:hover{background:#3d7a3e}
+ button.skip{background:#5a5a5a}
+ button.done{background:#C9A227;color:#1b1b1b;font-weight:600}
+ .hint{font-size:12.5px;color:#9db98c;margin:10px 0 4px;text-align:center;line-height:1.6}
+ textarea{width:min(90vw,760px);height:180px;margin-top:10px;font-family:ui-monospace,monospace;font-size:12px}
+</style></head><body>
+<header>
+ <h1>Severity grading &mdash; annotator_2</h1>
+ <div id="bar"><div id="fill"></div></div>
+ <div id="meta"></div>
+</header>
+<img id="pic" alt="(image failed to load)" onerror="document.getElementById('meta').textContent='Could not load '+IMAGES[i]+' - is the images folder next to this file?'">
+<div class="hint">
+ How much of the <b>LEAF</b> shows disease symptoms? Ignore the background.<br>
+ <b>0</b> none &nbsp;|&nbsp; <b>1</b> mild, under 5% &nbsp;|&nbsp; <b>2</b> moderate, 5&ndash;20% &nbsp;|&nbsp;
+ <b>3</b> severe, over 20% &nbsp;|&nbsp; <b>S</b> skip if unsure
+</div>
+<div class="btns">
+ <button onclick="grade(0)">0 &middot; none</button>
+ <button onclick="grade(1)">1 &middot; mild</button>
+ <button onclick="grade(2)">2 &middot; moderate</button>
+ <button onclick="grade(3)">3 &middot; severe</button>
+ <button class="skip" onclick="grade('')">S &middot; skip</button>
+ <button class="skip" onclick="back()">&larr; undo</button>
+</div>
+<div class="btns" style="margin-top:12px">
+ <button class="done" onclick="finish()">Show my grades.csv</button>
+</div>
+<textarea id="out" style="display:none" readonly></textarea>
+<script>
+const IMAGES=["6dc57c16-e5f8-41c4-9188-83c8d60cf931___GCREC_Bact.Sp 3597.jpg", "e609db4a-77b0-4f0d-9a36-74b63fa785ab___RS_L.Scorch 1589.jpg", "9f36da2c-ab51-4fff-b394-ad22b15508eb___JR_B.Spot 9032.jpg", "94dbcd4e-5fc8-47d6-a944-dc0cc7c6ead5___RS_GLSp 4638 copy.jpg", "d62872c2-d511-415e-aaf8-a18e0d8c6834___JR_Sept.L.S 2717.jpg", "4d9e2536-855e-4883-b954-824a1538ed79___UF.GRC_YLCV_Lab 02409.jpg", "54a75837-c1f8-4c1b-be76-2935d6e2a1fa___FAM_L.Blight 1420.jpg", "074bc781-f586-46b0-bef5-0237e3bf5043___RS_Erly.B 8375.jpg", "e5e4cd23-60b4-4b94-bd47-31495d8e7263___RS_NLB 3514 copy.jpg", "7e25ef0a-7cec-45c2-bc3f-2429b82cafd6___YLCV_GCREC 1896.jpg", "84f666da-9e17-4e90-9813-0ed64da175d9___RS_LB 2536.jpg", "8491569f-a7d8-453c-86ae-c2accdc964c9___GCREC_Bact.Sp 5943.jpg", "cf3c8095-91ae-4f7f-9537-aac1674fda21___YLCV_GCREC 2104.jpg", "a7fd8958-d63e-4fae-964d-75d80d739c1f___CREC_HLB 6564.jpg", "47f24ceb-34e8-4c13-acac-e48549bc7cfa___RS_NLB 3932 copy 2.jpg", "d39aadb4-c3f8-45a0-a92c-913263278c29___RS_GLSp 4654.jpg", "3bd94dcb-b7af-484e-8ec0-f992eb9bcccc___Rut._Bact.S 0846.jpg", "42b19bb3-68b6-4c46-a626-f7480718360a___RS_LB 4686.jpg", "f3a574c8-043a-4804-bdba-addb50450720___RS_NLB 3553 copy.jpg", "619237cc-ca9b-43fa-be38-5e2b29a5f98e___Rutg._Bact.S 1954.jpg", "1fa8564c-87f3-421d-aaf8-bfa276a29ab5___FAM_B.Msls 4166.jpg", "21f9a0a5-b145-40e7-8884-df2bb52eb592___RS_Erly.B 7391.jpg", "86562214-f8b9-4105-9513-4847520aff9a___RS_Early.B 7515.jpg", "a0e8fa68-4958-44d8-8f53-a66927102422___Matt.S_CG 6592.jpg", "9a3a8b0b-0587-402d-814d-c0201c4f9b5a___UF.GRC_BS_Lab Leaf 0687.jpg", "52ec4621-e082-46fa-8102-f1776a3243dd___UF.Citrus_HLB_Lab 0570.jpg", "c61c9a75-61bb-4f14-b5a5-501c6ca5bccc___GCREC_Bact.Sp 3795.jpg", "502fb732-b98c-4472-9bf3-5a0c038492fc___UF.GRC_BS_Lab Leaf 8642.jpg", "e0e79271-2e26-47f2-a88d-4f222fbfeabe___UF.Citrus_HLB_Lab 0117.jpg", "c91abd9b-94e4-401a-893d-a93956048f54___JR_B.Spot 3124.jpg", "6880b763-1f12-4d80-9aa8-a2b8eecaed1a___RS_NLB 3543.jpg", "6ca44bd5-2e7f-4648-9612-f9a4359e6361___CREC_HLB 7135.jpg", "47487db4-da7f-4104-9511-8ce9d1ced14e___UF.GRC_YLCV_Lab 03046.jpg", "b76c43c7-a0d3-43ca-b172-46cfbc192739___Rutg._Bact.S 2169.jpg", "552cc656-707d-4254-b463-56f6f3aebea5___CREC_HLB 6721.jpg", "f23076a1-b482-4370-91c4-6e722a44da8c___Matt.S_CG 7558.jpg", "1742dfdd-c687-46ff-b958-34194feb68e4___RS_Erly.B 7453.jpg", "fa1c19f6-4e9e-4452-ad0d-99f65d5c9909___NREC_B.Spot 1960.jpg"], KEY="grades_annotator_2";
+let g=JSON.parse(localStorage.getItem(KEY)||"{}"), i=0;
+function firstUngraded(){for(let k=0;k<IMAGES.length;k++)if(!(IMAGES[k] in g))return k;return IMAGES.length;}
+function show(){
+  i=Math.min(i,IMAGES.length-1);
+  const done=Object.keys(g).length;
+  document.getElementById("fill").style.width=(100*done/IMAGES.length)+"%";
+  document.getElementById("meta").textContent=`${done} / ${IMAGES.length} graded  -  now showing #${i+1}: ${IMAGES[i]}`;
+  document.getElementById("pic").src="images/"+encodeURIComponent(IMAGES[i]);
+}
+function grade(v){g[IMAGES[i]]=v;localStorage.setItem(KEY,JSON.stringify(g));i=firstUngraded();
+  if(i>=IMAGES.length){finish();}else{show();}}
+function back(){i=Math.max(0,i-1);delete g[IMAGES[i]];localStorage.setItem(KEY,JSON.stringify(g));show();}
+function finish(){
+  let csv="image,manual_grade\n";
+  IMAGES.forEach(n=>{csv+=n+","+(n in g?g[n]:"")+"\n";});
+  const t=document.getElementById("out");t.style.display="block";t.value=csv;t.select();
+  document.getElementById("meta").textContent="Done. Copy the text below into grades.csv, or save it as grades.csv.";
+}
+document.addEventListener("keydown",e=>{
+  if(["0","1","2","3"].includes(e.key))grade(parseInt(e.key));
+  else if(e.key.toLowerCase()==="s")grade("");
+  else if(e.key==="Backspace")back();});
+i=firstUngraded();show();
+</script></body></html>

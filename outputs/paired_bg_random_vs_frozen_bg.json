@@ -1,0 +1,35 @@
+{
+  "arm_a": "bg_random",
+  "arm_b": "frozen_bg",
+  "n": 2525,
+  "all_38": {
+    "n": 2525,
+    "accuracy_a": 16.71,
+    "accuracy_b": 18.06,
+    "only_a_correct": 209,
+    "only_b_correct": 243,
+    "discordant": 452,
+    "net_gain_b": 34,
+    "p_value": 0.12052044976188811
+  },
+  "crop": {
+    "n": 2525,
+    "accuracy_a": 39.64,
+    "accuracy_b": 41.39,
+    "only_a_correct": 328,
+    "only_b_correct": 372,
+    "discordant": 700,
+    "net_gain_b": 44,
+    "p_value": 0.1040422371334152
+  },
+  "binary": {
+    "n": 2525,
+    "accuracy_a": 71.05,
+    "accuracy_b": 75.21,
+    "only_a_correct": 187,
+    "only_b_correct": 292,
+    "discordant": 479,
+    "net_gain_b": 105,
+    "p_value": 1.8419561650584375e-06
+  }
+}
