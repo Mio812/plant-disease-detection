@@ -18,6 +18,9 @@ outputs_quick/
 *.pt
 *.ckpt
 
+# Run logs (kept locally, not in git)
+logs/
+
 # OS / editor
 .DS_Store
 .idea/
