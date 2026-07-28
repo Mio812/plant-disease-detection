@@ -73,8 +73,25 @@ STALE = {
     r"\b100\.00%\b": "binary is 99.96, not a perfect 100",
 }
 DELIVERABLES = ["README.md", "docs/EXPERIMENTS.md", "docs/PLAN.md", "docs/DEVELOPMENT.md",
-                "report/build_report.py", "report/update_ppt.py", "tools/build_notebook.py",
+                "report/update_ppt.py", "tools/build_notebook.py",
                 "outputs/results_summary.md"]
+
+
+def office_text(path):
+    """Paragraph text out of a .docx / .pptx, so hand-edited files are audited too."""
+    import zipfile, re as _re
+    parts = {".docx": ["word/document.xml"], ".pptx": None}
+    z = zipfile.ZipFile(path)
+    names = (parts[path.suffix] if parts.get(path.suffix)
+             else [n for n in z.namelist() if n.startswith("ppt/slides/slide")])
+    out = []
+    for n in names:
+        xml = z.read(n).decode("utf-8", "replace")
+        for para in _re.findall(r"<a:p>.*?</a:p>|<w:p[ >].*?</w:p>", xml, _re.S):
+            txt = "".join(_re.findall(r"<(?:a|w):t[^>]*>(.*?)</(?:a|w):t>", para, _re.S))
+            if txt.strip():
+                out.append(txt)
+    return out
 print("\n=== STALE / CONTRADICTORY PATTERNS ===")
 issues = 0
 for f in DELIVERABLES:

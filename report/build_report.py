@@ -1,6 +1,19 @@
-"""COMP9444 Project 090 report. Honest leaf-grouped rebuild numbers.
-Run: uv run --with python-docx python report/build_report.py
+"""SUPERSEDED — kept for provenance only. Do not run.
+
+This generated the first full draft. The live report is now the team's edited
+version (Results material moved into Discussion, EXPERIMENTS filled by
+report/fill_experiments.py). Running this would overwrite that hand-editing, so
+it refuses unless --force is passed.
 """
+import sys
+
+if "--force" not in sys.argv:
+    raise SystemExit(
+        "refusing to run: report/COMP9444_Project_Report.docx is the team's edited "
+        "version and this script would overwrite it. Pass --force only if you "
+        "genuinely want to discard those edits."
+    )
+
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
