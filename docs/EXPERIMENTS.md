@@ -35,7 +35,7 @@ aim is met. It is also where the marks for *Discussion*, *Results* and
 | H6 | Lesion-area ratio is a valid severity signal, and official leaf masks beat Otsu segmentation. | confirmed |
 | H7 | Field accuracy is limited by crop identification, not by disease diagnosis. | confirmed |
 | H8 | Full fine-tuning on PlantVillage degrades the pretrained features that transfer to field images, so a frozen backbone transfers better. | **confirmed, localised to binary** — honest McNemar: freezing gives binary +105/479 p = 1.8e-6 at `p = 0.7`; the crop/38-way effect is only marginal (p = 0.04–0.12). The leaky split overstated it (crop had read p = 2e-8) because the leaky full fine-tune was more overfit to memorised leaves |
-| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **magnitude rejected, mechanism unproven** — crop rose 36.99 → 38.73, p = 0.014 raw, which does **not** survive correction for the 12 paired tests run; 38-way p = 0.10. Nowhere near the ~60% predicted, and below simply freezing the backbone (40.12) |
+| H9 | Making crop an explicit subproblem raises field accuracy, because the crop term is the binding constraint. | **magnitude rejected, mechanism unproven** — crop rose 39.64 → 40.48, McNemar p = 0.27 on the honest split; 38-way p = 0.94. Nowhere near the ~60% predicted, and below simply freezing the backbone with `p = 0.7` (41.39) |
 | H10 | The residual field gap is a *scale* mismatch. PlantVillage leaves already fill 47.5% of the frame and both augmentation recipes only ever enlarge them, so a leaf at field apparent size falls outside the training support entirely. | open |
 | H11 | Strong photometric augmentation buys measurable robustness to field capture variation, so accuracy degrades less across the lighting and sharpness tails than it does for standard augmentation. | **rejected** — E21: field accuracy is nearly flat across luminance/contrast bins (gaps < 1.6 pt) for both arms, and on sharpness the strong-aug arm is *more* sensitive (+3.7), not less. The more useful finding is that the field failure is uniform across capture quality, so it is the domain gap, not image quality |
 | H12 | Task 1 is healthy-vs-diseased, which does not require species identification — the very thing H7 shows is the field bottleneck. Training the binary objective directly should therefore transfer better than collapsing a 38-way model's predictions. | open |
@@ -53,13 +53,14 @@ on all 2,525 field images, as E16 specified before any of it ran:
 
 | Arm | Trainable | PlantVillage | PlantDoc 38-way | crop |
 |---|---|---|---|---|
-| Full fine-tune, `p = 0.0` | 11,196,006 | 99.52% | 14.69% | 34.10% |
-| Full fine-tune, `p = 0.7` | 11,196,006 | 99.26% | 16.32% | 36.99% |
-| Frozen backbone, `p = 0.0` | 19,494 (0.17%) | 91.70% | **17.47%** | 40.12% |
-| Frozen backbone, `p = 0.7` | 19,494 (0.17%) | 89.12% | 16.87% | **41.47%** |
+| Full fine-tune, `p = 0.0` | 11,196,006 | 99.20% | 15.17% | 37.19% |
+| Full fine-tune, `p = 0.7` | 11,196,006 | 98.82% | 16.71% | 39.64% |
+| Frozen backbone, `p = 0.0` | 19,494 (0.17%) | 91.26% | 16.91% | 39.37% |
+| Frozen backbone, `p = 0.7` | 19,494 (0.17%) | 88.41% | **18.06%** | **41.39%** |
 
-Freezing costs 8.98 points of PlantVillage accuracy and **gains** 1.67 in the
-field, 4.13 on healthy-vs-diseased and 5.25 on crop identification. Training
+Freezing costs 7.94 points of PlantVillage accuracy and **gains** 1.74 in the field
+and 2.18 on crop identification at `p = 0.0`; at `p = 0.7` the field gain is +1.35 and
+healthy-vs-diseased gains +4.16 (McNemar p = 1.8e-6). Training
 574x more parameters is not merely worthless outside the benchmark — it is
 actively harmful, and the harm falls on species recognition, which H7 identifies
 as the binding constraint.
@@ -71,28 +72,32 @@ reading was underpowered, not wrong in principle: the same-basis rule and E16's
 as soon as the pre-specified basis is used. The status is corrected rather than
 the criterion.
 
-The 2x2 also separates mechanism from effect. Background randomisation helps the
-trainable backbone (+1.63) and *hurts* the frozen one (-0.60), which is what the
-shortcut account predicts: the intervention exists to stop a backbone acquiring
-PlantVillage's capture bias, and a frozen ImageNet backbone never had the
-opportunity to acquire it. ImageNet already separates plant species; fine-tuning
-on studio photographs, where species is readable off background and outline,
-degrades that ability.
+The 2x2 was also meant to separate mechanism from effect, and on the leaky split it
+appeared to: background randomisation helped the trainable backbone (+1.63) and
+*hurt* the frozen one (-0.60), which is exactly what the shortcut account predicts,
+since a frozen ImageNet backbone never had the opportunity to acquire PlantVillage's
+capture bias. **The honest split does not reproduce that interaction.** Background
+randomisation helps both arms by a similar margin (trainable +1.54, frozen +1.15 on
+38-way; +2.45 and +2.02 on crop), so the effect is additive and the mechanistic
+claim is withdrawn. It is recorded here rather than deleted because the interaction
+was the reason the 2x2 was run, and its disappearance is itself the result: what
+survives is that ImageNet features transfer better than PlantVillage-tuned ones, not
+that de-shortcutting only matters for trainable backbones.
 
 ### What the field accuracy is actually made of
 
 Reporting a single number hides the failure mode. Decomposing the best zero-shot
-arm — frozen backbone, `p = 0.0`, 224px — on **all 2,525** field images:
+arm — frozen backbone, `p = 0.7`, 224px — on **all 2,525** field images:
 
 | Level | Accuracy | Chance |
 |---|---|---|
-| All 38 classes | 17.47% | 2.6% |
-| Restricted to the 27 reachable classes | 19.88% | 3.7% |
-| Crop species only | 40.12% | 7.1% |
-| Disease, given the crop was right | 43.53% | ~33% |
-| Healthy vs diseased | 73.94% | 50% |
+| All 38 classes | 18.06% | 2.6% |
+| Restricted to the 27 reachable classes | 19.96% | 3.7% |
+| Crop species only | 41.39% | 7.1% |
+| Disease, given the crop was right | 43.64% | ~33% |
+| Healthy vs diseased | 75.21% | 50% |
 
-`0.4012 x 0.4353 = 0.1747`, so the two factors account for the whole number. Once
+`0.4139 x 0.4364 = 0.1806`, so the two factors account for the whole number. Once
 the species is right the diagnosis runs at 1.3x chance, weak but real; the species
 itself is right under half the time. The bottleneck is recognising the plant, not
 recognising the disease — and every arm in E16 shows the same shape, so this is a
@@ -190,19 +195,23 @@ images across all dataset variants). Field numbers carry Wilson 95% intervals.
 - If E3 scored near 2.6%, and E5 showed attention concentrated on the leaf,
   H2 would be rejected and the 99.8% would be taken at face value.
 - If E8 with `p = 0.0` matched `p = 0.7` on PlantDoc, the gain would be
-  attributable to augmentation alone and H5 would be rejected. **This is what we
-  observe**: 23.73% vs 24.15%, a gap far inside the ±5.5pp interval at n = 236.
-  E15 and E16 re-score both arms on all 2,525 images to decide it properly.
+  attributable to augmentation alone and H5 would be rejected. On the 236-image
+  split the two looked identical, which is what an underpowered basis does; on the
+  pre-specified 2,525-image basis they separate (15.17% vs 16.71%, crop 37.19% vs
+  39.64%) and the paired test confirms it (McNemar p = 0.0013 on crop), so H5
+  stands.
 - If the frozen backbone transferred *worse* than the full fine-tune, H8 would be
   rejected and the low field accuracy would have to be attributed to the domain
   gap alone rather than to fine-tuning damaging transferable features.
 - If E9 (trained on `segmented`) scored poorly *in-domain*, the E4 collapse
   would be explained by loss of information rather than loss of a shortcut.
 - If E13's AUC were near 0.5, the severity signal would be meaningless.
-- E14 outcome (recorded honestly): two annotators graded all 150 leaves and agree
-  at quadratic κ 0.72, so the grade is well-defined. The lesion-ratio estimate
-  tracks the human consensus at ρ 0.47 (p < 0.001) and κ 0.29 — a real but weak
-  signal, far below the human ceiling. The model never outputs "healthy" while
+- E14 outcome (recorded honestly): three annotators graded all 150 leaves and agree
+  with each other at mean pairwise quadratic κ 0.634, so the grade is well-defined.
+  The lesion-ratio estimate tracks the human consensus at ρ 0.464 (p < 0.001) and
+  κ 0.30, rising to κ 0.472 after cross-validated recalibration — a real but only
+  moderate signal, about 74% of the human ceiling. With the original rubric bands
+  the model never output "healthy" while
   humans call ~30% of these diseased leaves symptom-free, so the miscalibration is
   specifically at the healthy/mild boundary. Severity from image features is
   therefore reported as a **weak proxy, not a trustworthy grade** — the honest RQ3
@@ -280,7 +289,7 @@ something invented.
 2. A drop in PlantVillage accuracy when the shortcut is removed is expected and
    is *not* a regression — it is the price of generalisation.
 3. E11 never shares a row with zero-shot numbers.
-4. `ft_robust` (48.73%) and `ft_baseline` start from checkpoints differing in
+4. `ft_robust` (47.03%) and `ft_baseline` start from checkpoints differing in
    resolution, augmentation *and* background randomisation, so their gap is not
    evidence for any one of them. `ft_aug_only` differs from `ft_robust` in
    `p_random` alone and is the arm the E11 claim rests on.
