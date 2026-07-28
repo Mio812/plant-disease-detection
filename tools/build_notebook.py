@@ -79,6 +79,17 @@ code("import os",
     "    path = OUT / name",
     "    return json.loads(path.read_text(encoding='utf-8')) if path.exists() else None",
     "",
+    "from IPython.display import Image, display",
+    "",
+    "FIGDIR = ROOT / 'report' / 'figures'",
+    "def figure(name):",
+    "    \"\"\"Show a report figure; rebuild the set from outputs/ if it is missing.\"\"\"",
+    "    path = FIGDIR / name",
+    "    if not path.exists():",
+    "        import subprocess, sys as _s",
+    "        subprocess.run([_s.executable, '-m', 'tools.make_figures'], cwd=ROOT, check=False)",
+    "    return display(Image(filename=str(path))) if path.exists() else print('missing', name)",
+    "",
     "device = 'cuda' if torch.cuda.is_available() else 'cpu'",
     "print('project root:', ROOT)",
     "print('device:', device)")
@@ -271,6 +282,14 @@ code("import itertools",
     "        print(f'  {tag:14s} 38-class errors {r[1]:3d} | healthy<->diseased crossings {r[2]:2d} "
     "| BINARY {r[0]:.2f}%')")
 
+code("figure('per_disease_accuracy.png')")
+
+md("*Per-disease recall on the leaf-grouped split. 29 of 38 classes are perfect; the five in red are within-crop look-alikes.*")
+
+code("figure('confusion_matrix.png')")
+
+md("*The confusion matrix. The diagonal is essentially clean; red digits are the 39 misclassified images, three of which cross the healthy/diseased boundary.*")
+
 md("### 6.2 RQ2 — does that accuracy survive contact with reality? (E4–E7)",
    "",
    "Four probes, each removing one comfort of the benchmark.")
@@ -306,6 +325,10 @@ md("**Reading the table.** The same leaves, with only the background masked out,
    "and AdaBN (recomputing BatchNorm statistics on the field images). Neither helps,",
    "which is itself informative — the failure is a **learned shortcut**, not a",
    "distribution-statistics mismatch, so it has to be fixed during training.")
+
+code("figure('lab_vs_field.png')")
+
+md("*The same ensemble on studio and field photographs: fine-grained accuracy collapses, and even the coarse healthy/diseased decision loses about twenty points.*")
 
 md("### 6.3 Closing the gap (E8–E11)",
    "",
@@ -359,6 +382,10 @@ md("Freezing the backbone costs ~8 points of PlantVillage accuracy and **matches
    "parameters buy are worth nothing — often less than nothing — outside the benchmark.",
    "This decouples the two accuracies with a direct control, not an inference.")
 
+code("figure('frozen_vs_full.png')")
+
+md("*The strongest control: training 574x fewer parameters costs about eight points in the laboratory and loses nothing in the field.*")
+
 md("### 6.5 Where the field accuracy goes, and how much data closes it (E11, E16, E18)",
    "",
    "Field accuracy factorises as *crop identification x diagnosis given the crop*. The",
@@ -378,6 +405,10 @@ code("d = load('eval_arm_bg_random.json')",
     "if pts:",
     "    print('\\nadaptation curve (PlantDoc 20-shot fine-tune, 236-image test):')",
     "    for s,b in pts: print(f\"  {str(s):>4} shots  {b:.2f}%\")")
+
+code("figure('adaptation_curve.png')")
+
+md("*Supervised adaptation, the honest remedy: 16.1% zero-shot to 55.9% with the full field training set.*")
 
 md("### 6.6 RQ3 — severity from image features (E12–E14, E26)")
 
@@ -417,6 +448,10 @@ md("Three findings, reported honestly:",
    "  at no classification cost, and beats both classical estimators on human agreement",
    "  (rho 0.47 vs Otsu 0.43). Severity is now a genuine model output, no mask needed at",
    "  inference — though all lesion-area methods plateau near the human ceiling.")
+
+code("figure('severity.png')")
+
+md("*Severity. Left: the grade against three annotators, with their mutual agreement as the ceiling. Right: trained jointly with the classifier, severity becomes a model output that beats the classical estimator.*")
 
 # ------------------------------------------------------------- 7. Discussion
 md("## 7. Discussion",
