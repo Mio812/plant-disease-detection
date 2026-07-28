@@ -34,6 +34,17 @@ def p(text, size=None, italic=False, color=None):
     return par
 
 
+def figure(name, caption):
+    doc.add_picture(f"report/figures/{name}", width=Inches(6.1))
+    doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    par = doc.add_paragraph()
+    par.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run = par.add_run(caption)
+    run.font.size = Pt(8.5)
+    run.italic = True
+    run.font.color.rgb = RGBColor(0x52, 0x51, 0x4E)
+
+
 def table(headers, rows):
     t = doc.add_table(rows=1, cols=len(headers))
     t.style = "Light Grid Accent 1"
@@ -130,10 +141,17 @@ table(["Model", "38-way (specific disease)"],
       [["Custom CNN (from scratch)", "98.69%"], ["ResNet-18", "99.33%"],
        ["MobileNet-V2", "99.46%"], ["Ensemble (proposed)", "99.53%"],
        ["Ensemble — binary healthy/diseased", "99.96%"]])
-p("The 13 residual errors out of 8,145 are almost all within-crop disease confusions that a specialist "
-  "would find genuinely ambiguous (for example Tomato early versus late blight); no image crosses the "
-  "healthy/diseased boundary, which is why the binary task is essentially solved. Across the dataset's "
-  "three variants the model holds: colour 99.53%, segmented 98.66%, grayscale 97.76%.")
+p("The 39 residual errors out of 8,215 are almost all within-crop disease confusions that a specialist "
+  "would find genuinely ambiguous (for example Tomato early versus late blight). Three of them do cross "
+  "the healthy/diseased boundary — and two of those are diseased leaves called healthy, the costlier "
+  "direction for a farmer — so the binary task is near-solved at 99.96% rather than perfect. Across the "
+  "dataset's three variants the model holds: colour 99.53%, segmented 98.66%, grayscale 97.76%.")
+figure("per_disease_accuracy.png",
+       "Figure 1 — Per-disease recall on the leaf-grouped test split. 29 of 38 classes are perfect; "
+       "the five in red are within-crop look-alikes.")
+figure("confusion_matrix.png",
+       "Figure 2 — Ensemble confusion matrix (row-normalised). The diagonal is essentially clean; red "
+       "digits are the 39 misclassified images.")
 
 h("5. Results — is the 99% real?")
 p("Two independent audits show that the headline number overstates real diagnostic skill.")
@@ -145,7 +163,7 @@ p("A classifier trained on eight background border pixels alone — never seeing
 h("5.2 Leaf-level leakage", 2)
 p("Adopting the leaf-grouped split lowers the ensemble from 99.84% to 99.53% — a 0.31-point drop, small "
   "because the classification is genuinely strong, but real. Per disease the effect concentrates: Tomato "
-  "early blight falls from a leaked 99% to an honest 91%, exposing the one diagnostic weakness the leaked "
+  "early blight falls from a leaked 99% to an honest 93%, exposing the one diagnostic weakness the leaked "
   "test had hidden. A perceptual re-check bounds the residual leakage the metadata missed at under 10.7% "
   "(an over-estimate, since PlantVillage's near-identical distinct leaves inflate it); the 0.31-point "
   "accuracy cost confirms the residual is immaterial.")
@@ -154,6 +172,10 @@ h("6. Results — does it survive the field?")
 p("Zero-shot on PlantDoc, the ensemble scores 16.1% (236-image test split) and 13.9% across all 2,525 "
   "images — a collapse from 99.5% in the laboratory. This is the answer to RQ2, and it is the central "
   "result: the benchmark accuracy does not transfer to the conditions the brief describes.")
+figure("lab_vs_field.png",
+       "Figure 3 — The same ensemble on studio and field photographs. Fine-grained accuracy collapses; "
+       "even the coarse healthy/diseased decision loses ~20 points.")
+
 h("6.1 Where the accuracy goes", 2)
 p("Decomposing field accuracy into crop identification and disease-given-crop shows the bottleneck is "
   "recognising the plant, not the disease: crop accuracy is only 39.6%. Background randomisation during "
@@ -166,6 +188,10 @@ table(["Arm (field, 2,525 images)", "Trainable params", "Lab", "Field", "Crop"],
       [["Full fine-tune", "11,196,006", "99.20%", "15.2%", "37.2%"],
        ["Frozen backbone", "19,494", "91.26%", "16.9%", "39.4%"],
        ["Frozen + bg-random", "19,494", "88.41%", "18.1%", "41.4%"]])
+figure("frozen_vs_full.png",
+       "Figure 4 — The strongest control: training 574x fewer parameters costs ~8 points in the "
+       "laboratory and loses nothing in the field.")
+
 h("6.2 Robustness and adaptation", 2)
 p("Field accuracy is nearly flat across capture-quality bins (luminance, contrast, and sharpness gaps "
   "under 1.6 points), so the failure is not caused by poor photographs — it is uniform across bright, "
@@ -174,6 +200,10 @@ p("Field accuracy is nearly flat across capture-quality bins (luminance, contras
   "raises accuracy from 16.1% through 47.0% at 20 shots per class to 55.9% with all field data, an "
   "improvement of 39.8 points over the zero-shot baseline that meets the reference dataset's own "
   "31-point improvement target.")
+
+figure("adaptation_curve.png",
+       "Figure 5 — Supervised adaptation on field data, the honest remedy: 16.1% zero-shot to 55.9% "
+       "with the full field training set.")
 
 h("7. Results — Task 2: severity")
 p("PlantVillage carries no severity labels, so severity is derived from the lesion-area ratio. As a "
@@ -191,6 +221,11 @@ p("To satisfy the brief's requirement to expand the model, we trained a severity
   "the best severity estimator available and a model output — but all lesion-area methods plateau near "
   "rho 0.47 against humans, because people grade severity by more than the fraction of leaf area affected. "
   "We report this as the ceiling of image-feature severity estimation rather than inflate it.")
+
+figure("severity.png",
+       "Figure 6 — Severity. Left: the grade against three human annotators, with their mutual "
+       "agreement as the ceiling. Right: trained jointly with the classifier, severity becomes a "
+       "model output that beats the classical estimator.")
 
 h("8. Discussion")
 p("The project's contribution is not a 99% accuracy; it is the demonstration, with controlled experiments "

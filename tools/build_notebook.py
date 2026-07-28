@@ -258,14 +258,14 @@ md("The brief asks for **healthy vs diseased**. Because no ensemble error crosse
    "boundary, the binary task is solved outright:")
 
 code("import itertools",
-    "def binary_accuracy(tag, n=8145):",
+    "def binary_accuracy(tag, n=8215):",
     "    cp = load(f'{tag}_confused_pairs.json')",
     "    if not cp: return None",
     "    h = lambda x: 'healthy' in x.lower()",
     "    cross = sum(p['count'] for p in cp['pairs'] if h(p['true']) != h(p['pred']))",
     "    return 100 * (n - cross) / n, cp['total_errors'], cross",
     "",
-    "for tag in ['custom_cnn', 'resnet18', 'mobilenet_v2', 'ensemble']:",
+    "for tag in ['custom_cnn', 'resnet18', 'mobilenet_v2', 'ensemble_plantvillage']:",
     "    r = binary_accuracy(tag)",
     "    if r:",
     "        print(f'  {tag:14s} 38-class errors {r[1]:3d} | healthy<->diseased crossings {r[2]:2d} "

@@ -260,7 +260,8 @@ physical leaf shared with training — see *Test-set integrity* below):
 leaves. Averaging them by a validation-tuned weighted vote lifts accuracy to
 **99.53%** over the 38 specific-disease classes and **99.96%** on the healthy-vs-diseased
 task the brief names — with **39 / 8,215** errors, almost all within-crop disease
-look-alikes (e.g. Tomato early vs late blight) and **no** healthy/diseased crossing.
+look-alikes (e.g. Tomato early vs late blight); three cross the healthy/diseased
+boundary, which is why the binary figure is 99.96% rather than a perfect 100%.
 Per-model history, classification report, and confusion matrix are in `outputs/`.
 
 Each non-default row is reproduced with (same config, model overridden):
@@ -281,7 +282,7 @@ near-duplicates: 74.7% of a random test split had a same-leaf twin in training. 
 split by *leaf* instead, so no leaf straddles the partition. This is the split used
 everywhere here; adopting it lowered the ensemble from a leaked 99.84% to an honest
 99.53%, and per disease it exposed Tomato early blight falling from a leaked 99% to
-an honest 91% — the one diagnostic weakness the leak had hidden.
+an honest 93% — the one diagnostic weakness the leak had hidden.
 
 **1. The background alone predicts the label.** A logistic regression trained on
 **8 border pixels** — no leaf at all — reaches **33.7%** accuracy over 38 classes
@@ -332,8 +333,8 @@ vs Otsu 0.43). All lesion-area methods plateau near the human ceiling, because
 severity is more than lesion area — reported honestly rather than inflated.
 
 **Task 1 as the brief words it.** For "healthy vs diseased", the ensemble reaches
-**99.96%** on the held-out test split — no error crosses the healthy/diseased
-boundary. That figure falls to **80.5%** on field photographs, so even the coarse
+**99.96%** on the held-out test split; three of the 39 errors cross the
+healthy/diseased boundary, two of them diseased leaves called healthy. That figure falls to **80.5%** on field photographs, so even the coarse
 decision the brief asks for is partly propped up by the benchmark. The honest
 deployment path is domain adaptation: fine-tuning on field data recovers accuracy
 from 16.1% to **55.9%**.
