@@ -396,29 +396,46 @@ def fig_dataset():
     diseased = 100 * (total - healthy) / total
     tr, va, te = (100 * len(s) / total for s in splits_from_config(cfg, base))
 
-    REST = "#e6e8ea"
+    n_top10 = int(np.sort(counts)[::-1][:10].sum())
+    tr_n, va_n, te_n = (len(s) for s in splits_from_config(cfg, base))
+    # every segment is named and counted, so the ring itself carries the reading
     panels = [
-        ([top10, 100 - top10], [RED, REST], f"{top10:.0f}%", "top 10 classes",
-         "Class imbalance", f"10 of 38 classes hold {top10:.0f}%  ·  36:1 largest : smallest"),
-        ([74.7, 25.3], [ORANGE, REST], "74.7%", "leaked",
-         "Naive split leakage", "74.7% of test had a same-leaf twin  ·  0% after the fix"),
-        ([tr, va, te], [AQUA, "#7fd3b4", "#cfeee1"], f"{tr:.0f}%", "training",
-         "Leaf-grouped split", f"{tr:.0f} / {va:.0f} / {te:.0f}   train · val · test"),
-        ([diseased, 100 - diseased], [BLUE, REST], f"{diseased:.0f}%", "diseased",
-         "Label balance", f"{diseased:.0f}% diseased  ·  {100 - diseased:.0f}% healthy"),
+        ("Class imbalance",
+         [("10 largest\nclasses", top10, n_top10, RED),
+          ("28 smaller\nclasses", 100 - top10, total - n_top10, "#f6b9b8")],
+         "36:1", "max : min"),
+        ("Split leakage (before the fix)",
+         [("same-leaf\ntwin in train", 74.7, round(8215 * 0.747), ORANGE),
+          ("genuinely\nunseen", 25.3, 8215 - round(8215 * 0.747), "#f8c7ae")],
+         "74.7%", "leaked"),
+        ("Leaf-grouped split",
+         [("train", tr, tr_n, AQUA), ("val", va, va_n, "#7fd3b4"),
+          ("test", te, te_n, "#cfeee1")],
+         "54,305", "images"),
+        ("Label balance",
+         [("diseased", diseased, total - healthy, BLUE),
+          ("healthy", 100 - diseased, healthy, "#9ec5f4")],
+         "38", "classes"),
     ]
 
-    fig, axes = plt.subplots(1, 4, figsize=(13.2, 4.4))
-    for ax, (vals, cols, big, small, title, caption) in zip(axes, panels):
-        ax.pie(vals, colors=cols, startangle=90, counterclock=False,
-               wedgeprops=dict(width=0.34, edgecolor=SURFACE, linewidth=2))
-        ax.text(0, 0.08, big, ha="center", va="center", fontsize=19,
+    fig, axes = plt.subplots(1, 4, figsize=(14.4, 5.0))
+    for ax, (title, segs, big, small) in zip(axes, panels):
+        wedges, _ = ax.pie([s[1] for s in segs], colors=[s[3] for s in segs],
+                           startangle=90, counterclock=False,
+                           wedgeprops=dict(width=0.40, edgecolor=SURFACE, linewidth=2.5))
+        ax.text(0, 0.10, big, ha="center", va="center", fontsize=17,
                 fontweight="bold", color=INK)
-        ax.text(0, -0.20, small, ha="center", va="center", fontsize=8.5, color=MUTED)
-        ax.set_title(title, fontsize=12, fontweight="bold", color=INK, pad=16)
-        ax.text(0, -1.45, caption, ha="center", va="center", fontsize=8.6, color=INK2)
+        ax.text(0, -0.17, small, ha="center", va="center", fontsize=8.5, color=MUTED)
+        for wedge, (name, pctv, n, _c) in zip(wedges, segs):
+            ang = np.deg2rad((wedge.theta1 + wedge.theta2) / 2)
+            x, y = np.cos(ang), np.sin(ang)
+            ax.text(1.20 * x, 1.20 * y, f"{name}\n{pctv:.0f}%  ·  {n:,}",
+                    ha="center" if abs(x) < 0.35 else ("left" if x > 0 else "right"),
+                    va="center", fontsize=8.6, color=INK, linespacing=1.5)
+        ax.set_title(title, fontsize=11.5, fontweight="bold", color=INK, pad=18)
+        ax.set_xlim(-1.85, 1.85); ax.set_ylim(-1.7, 1.7)
         ax.set_aspect("equal")
-    fig.tight_layout(w_pad=1.8)
+    fig.tight_layout(w_pad=0.6)
     save(fig, "dataset_composition.png")
 
 
