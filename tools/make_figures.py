@@ -278,6 +278,68 @@ def fig_severity():
     save(fig, "severity.png")
 
 
+
+
+# ------------------------------------------------- 7. model architecture (Methods)
+def fig_architecture():
+    """Block diagram of the pipeline, for the Methods section."""
+    from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
+
+    fig, ax = plt.subplots(figsize=(10.2, 5.0))
+    ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+
+    def box(x, y, w, h, title, sub="", fc="#ffffff", ec=BLUE, tc=INK, lw=1.4):
+        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.006,rounding_size=0.012",
+                                    linewidth=lw, edgecolor=ec, facecolor=fc, zorder=2))
+        ax.text(x + w / 2, y + h / 2 + (0.028 if sub else 0), title, ha="center", va="center",
+                fontsize=9, fontweight="bold", color=tc, zorder=3)
+        if sub:
+            ax.text(x + w / 2, y + h / 2 - 0.032, sub, ha="center", va="center",
+                    fontsize=7.4, color=INK2, zorder=3)
+
+    def arrow(x1, y1, x2, y2, color=MUTED):
+        ax.add_patch(FancyArrowPatch((x1, y1), (x2, y2), arrowstyle="-|>", mutation_scale=11,
+                                     linewidth=1.2, color=color, zorder=1,
+                                     shrinkA=0, shrinkB=0))
+
+    box(0.01, 0.50, 0.135, 0.17, "Leaf image", "128² or 224²", fc="#f4f7fb", ec=AXIS, tc=INK2)
+    box(0.175, 0.50, 0.165, 0.17, "Augmentation", "standard / strong\n+ background rand.",
+        fc="#f4f7fb", ec=AXIS, tc=INK2)
+
+    ys = [0.72, 0.50, 0.28]
+    names = [("Custom CNN", "from scratch · 0.4M"),
+             ("MobileNet-V2", "ImageNet · 2.3M"),
+             ("ResNet-18", "ImageNet · 11.2M")]
+    for y, (n, s) in zip(ys, names):
+        box(0.375, y, 0.185, 0.155, n, s)
+        arrow(0.345, 0.585, 0.372, y + 0.078)
+        arrow(0.563, y + 0.078, 0.605, 0.60)
+
+    arrow(0.148, 0.585, 0.172, 0.585)
+    box(0.608, 0.46, 0.15, 0.25, "Soft-voting\nensemble", "weights tuned\non validation",
+        fc="#eef4fd", ec=BLUE, lw=1.8)
+
+    box(0.795, 0.615, 0.195, 0.135, "38-way disease", "specific class", ec=AQUA)
+    box(0.795, 0.445, 0.195, 0.135, "Healthy / diseased", "collapsed from 38", ec=AQUA)
+    arrow(0.760, 0.615, 0.792, 0.683, AQUA)
+    arrow(0.760, 0.560, 0.792, 0.513, AQUA)
+
+    # severity branch, sharing the ResNet-18 backbone
+    box(0.608, 0.10, 0.15, 0.165, "Severity head", "1-unit regressor\n(jointly trained)",
+        fc="#fdf3ee", ec=ORANGE, lw=1.6)
+    box(0.795, 0.10, 0.195, 0.165, "Lesion ratio", "→ 4 ordinal grades", ec=ORANGE)
+    arrow(0.468, 0.278, 0.468, 0.188, ORANGE)
+    arrow(0.468, 0.188, 0.605, 0.188, ORANGE)
+    arrow(0.760, 0.188, 0.792, 0.188, ORANGE)
+    ax.text(0.452, 0.228, "shared backbone", fontsize=7.2, color=ORANGE,
+            ha="right", va="center")
+
+    ax.text(0.0, 0.955, "Model architecture", fontsize=12, fontweight="bold", color=INK)
+    ax.text(0.0, 0.90, "Three CNNs are trained through one identical pipeline and combined by a "
+                       "validation-tuned soft vote; the severity head shares the ResNet-18 backbone.",
+            fontsize=8.5, color=INK2)
+    save(fig, "architecture.png")
+
 if __name__ == "__main__":
     print(f"writing figures to {FIG}/")
     fig_confusion()
@@ -286,3 +348,4 @@ if __name__ == "__main__":
     fig_frozen()
     fig_per_disease()
     fig_severity()
+    fig_architecture()
