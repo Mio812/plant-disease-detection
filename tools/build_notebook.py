@@ -2,21 +2,29 @@
 
 Heavy artefacts (training runs, full evaluations) are loaded from outputs/*.json
 so the notebook stays runnable; cheap analyses are recomputed live.
+
+    python -m tools.build_notebook [--execute]
+
+``--execute`` runs every cell and stores the outputs, which is how the committed
+copy is produced. Edit this file, never the .ipynb -- a regeneration overwrites it.
 """
 import json
+import sys
 from pathlib import Path
 
 cells = []
 
 
 def md(*lines):
-    cells.append({"cell_type": "markdown", "metadata": {},
+    # ids are positional and stable: nbconvert would otherwise assign fresh random
+    # ones on every execution and make the whole notebook show as changed
+    cells.append({"cell_type": "markdown", "id": f"md-{len(cells):02d}", "metadata": {},
                   "source": [l + "\n" for l in lines]})
 
 
 def code(*lines):
-    cells.append({"cell_type": "code", "execution_count": None, "metadata": {},
-                  "outputs": [], "source": [l + "\n" for l in lines]})
+    cells.append({"cell_type": "code", "id": f"code-{len(cells):02d}", "execution_count": None,
+                  "metadata": {}, "outputs": [], "source": [l + "\n" for l in lines]})
 
 
 # ------------------------------------------------------------------ 1. Intro
@@ -557,9 +565,9 @@ code("pair = load('paired_bg_random_vs_hier.json')",
     "        rows.append({'task': label, 'flat head (%)': d['accuracy_a'],",
     "                     'hierarchical (%)': d['accuracy_b'],",
     "                     'net images gained': d['net_gain_b'],",
-    "                     'discordant': d['discordant'], 'McNemar p': d['p_value']})",
-    "    display(pd.DataFrame(rows).set_index('task').style.format(",
-    "        {'McNemar p': '{:.3g}', 'flat head (%)': '{:.2f}', 'hierarchical (%)': '{:.2f}'}))",
+    "                     'discordant': d['discordant'],",
+    "                     'McNemar p': f\"{d['p_value']:.3g}\"})",
+    "    display(pd.DataFrame(rows).set_index('task'))",
     "    print(f\"paired on the same {pair['n']:,} field images; both arms use background randomisation\")")
 
 md("**E17 — the hierarchical head is rejected (H9).** The decomposition in Section 6.5",
@@ -781,3 +789,32 @@ out.write_text(json.dumps(notebook, indent=1, ensure_ascii=False), encoding="utf
 print(f"wrote {out} with {len(cells)} cells "
       f"({sum(1 for c in cells if c['cell_type'] == 'markdown')} markdown, "
       f"{sum(1 for c in cells if c['cell_type'] == 'code')} code)")
+
+if "--execute" in sys.argv:
+    import nbformat
+    from nbclient import NotebookClient
+
+    nb = nbformat.read(out, as_version=4)
+    # record_timing off: the timestamps are wall-clock, so leaving them in makes
+    # every re-execution a whole-file diff even when no output changed
+    NotebookClient(nb, timeout=3600, kernel_name="python3",
+                   resources={"metadata": {"path": str(out.parent)}},
+                   record_timing=False).execute()
+
+    # stdout arrives in however many chunks the kernel happened to flush, which is
+    # not stable between runs; merge them so a re-execution diffs as no change
+    for cell in nb.cells:
+        merged = []
+        for o in cell.get("outputs", []):
+            if (merged and o.output_type == "stream"
+                    and merged[-1].output_type == "stream" and merged[-1].name == o.name):
+                merged[-1].text += o.text
+            else:
+                merged.append(o)
+        if merged:
+            cell.outputs = merged
+    nbformat.write(nb, out)
+    failed = [i for i, c in enumerate(nb.cells) if c.cell_type == "code"
+              and any(o.output_type == "error" for o in c.outputs)]
+    print(f"executed {sum(1 for c in nb.cells if c.cell_type == 'code')} code cells"
+          + (f" -- ERRORS in {failed}" if failed else ", no errors"))
