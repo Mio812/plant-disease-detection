@@ -439,6 +439,95 @@ def fig_dataset():
     save(fig, "dataset_composition.png")
 
 
+def fig_variants():
+    """The three dataset variants on the same physical leaves. `segmented` is what
+    makes the background experiments possible, and seeing it explains why removing
+    the backdrop costs so much accuracy."""
+    from PIL import Image
+
+    from src.data.variants import name_key, variant_index
+
+    root = Path("data/PlantVillage/raw/color")
+    if not root.exists():
+        print("  (skipped variants — PlantVillage not downloaded)")
+        return
+    picks = ["Tomato___Late_blight", "Apple___Apple_scab", "Corn_(maize)___Common_rust_",
+             "Grape___healthy"]
+    rows = []
+    for cls in picks:
+        d = root / cls
+        if not d.exists():
+            continue
+        names = sorted(p.name for p in d.iterdir())[:12]
+        # prefer a leaf whose colour photo has a visible backdrop, so the segmented
+        # column actually shows something being removed
+        names.sort(key=lambda n: -float(np.asarray(Image.open(d / n))[0].mean()))
+        for name in names:
+            trio = [d / name]
+            for v in ("grayscale", "segmented"):
+                twin = variant_index(str(root.parent / v), cls).get(name_key(name))
+                if twin:
+                    trio.append(Path(twin))
+            if len(trio) == 3:
+                rows.append((cls, trio))
+                break
+    if not rows:
+        print("  (skipped variants — no matching image triples)")
+        return
+
+    fig, axes = plt.subplots(len(rows), 3, figsize=(6.0, 2.05 * len(rows)))
+    axes = np.atleast_2d(axes)
+    for r, (cls, trio) in enumerate(rows):
+        for c, path in enumerate(trio):
+            ax = axes[r, c]
+            ax.imshow(Image.open(path))
+            ax.set_xticks([]); ax.set_yticks([])
+            for sp in ax.spines.values():
+                sp.set_visible(True); sp.set_color(AXIS); sp.set_linewidth(0.8)
+            if r == 0:
+                ax.set_title(["colour", "grayscale", "segmented"][c],
+                             fontsize=10, fontweight="bold", color=INK, pad=7)
+        axes[r, 0].set_ylabel(short(cls), fontsize=8, color=INK2, rotation=0,
+                              ha="right", va="center", labelpad=8)
+    fig.suptitle("Every leaf ships in three variants", fontsize=11.5,
+                 fontweight="bold", color=INK, x=0.09, ha="left", y=1.005)
+    fig.tight_layout(h_pad=0.5, w_pad=0.3)
+    save(fig, "dataset_variants.png")
+
+
+def fig_learning_curves():
+    """Training histories of the three baselines. Included because the shape carries
+    the argument: validation accuracy is above 94% after one epoch, so the benchmark
+    was close to solved before training really began."""
+    runs = [("custom_cnn", "Custom CNN", BLUE), ("resnet18", "ResNet-18", ORANGE),
+            ("mobilenet_v2", "MobileNet-V2", AQUA)]
+    hist = {k: (load(f"{k}_history.json") or {}).get("history") for k, _, _ in runs}
+    if not any(hist.values()):
+        print("  (skipped learning curves — no histories)")
+        return
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.2, 3.7))
+    for key, label, colour in runs:
+        h = hist.get(key)
+        if not h:
+            continue
+        ep = [e["epoch"] for e in h]
+        ax1.plot(ep, [100 * e["val_accuracy"] for e in h], color=colour, linewidth=2, label=label)
+        ax1.plot(ep, [100 * e["train_acc"] for e in h], color=colour, linewidth=1,
+                 linestyle=":", alpha=0.75)
+        ax2.plot(ep, [e["val_loss"] for e in h], color=colour, linewidth=2, label=label)
+    ax1.set_ylim(70, 101)
+    style(ax1, "epoch", "accuracy (%)", "Validation accuracy (solid) vs training (dotted)")
+    style(ax2, "epoch", "validation loss", "Validation loss")
+    ax1.legend(frameon=False, fontsize=8.5, loc="lower right")
+    first = 100 * hist["mobilenet_v2"][0]["val_accuracy"]
+    ax1.annotate(f"{first:.0f}% after one epoch", xy=(1.1, first), xytext=(6.5, 83),
+                 fontsize=8.5, color=INK2,
+                 arrowprops=dict(arrowstyle="->", color=MUTED, linewidth=0.9))
+    fig.tight_layout(w_pad=2.0)
+    save(fig, "learning_curves.png")
+
+
 if __name__ == "__main__":
     print(f"writing figures to {FIG}/")
     fig_confusion()
@@ -449,3 +538,5 @@ if __name__ == "__main__":
     fig_severity()
     fig_architecture()
     fig_dataset()
+    fig_variants()
+    fig_learning_curves()

@@ -43,7 +43,28 @@ md("# Automatic Plant Disease Detection Using Computer Vision",
    "",
    "RQ1 turns out to be easy — and that is precisely why RQ2 matters. The full",
    "hypothesis list and experiment matrix are in [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md);",
-   "experiment ids (E1–E14) used below refer to it.")
+   "experiment ids (E1–E26) used below refer to it.",
+   "",
+   "> **How to read and how to re-run this notebook.** Every cell below is stored with",
+   "> its output, so the notebook can be read start to finish as a standalone document.",
+   "> The heavy work — 20+ training runs — is **not** repeated here: those results are",
+   "> loaded from the committed `outputs/*.json` artefacts, which is also what lets any",
+   "> number in this notebook be traced back to the run that produced it. Only the cheap",
+   "> analyses recompute live.",
+   ">",
+   "> To execute it yourself you need the repository *and* the datasets, which are too",
+   "> large to ship inside a notebook:",
+   ">",
+   "> ```bash",
+   "> git clone https://github.com/Mio812/plant-disease-detection && cd plant-disease-detection",
+   "> uv sync",
+   "> python -m scripts.prepare_data --dataset both   # PlantVillage + PlantDoc",
+   "> jupyter lab notebooks/plant_disease_detection.ipynb",
+   "> ```",
+   ">",
+   "> Reproducing the training runs themselves is `python -m scripts.run_all` (several",
+   "> GPU-hours). Cells that need a missing artefact print the exact command that",
+   "> produces it instead of failing.")
 
 md("## 2. Setup")
 
@@ -122,6 +143,10 @@ code("base = ImageFolder(cfg.data.root)",
     "print('PlantVillage variants available:', sorted(variants))",
     "print('PlantDoc test images:', sum(1 for _ in (ROOT / 'data/PlantDoc/test').rglob('*.*'))",
     "      if (ROOT / 'data/PlantDoc/test').exists() else 'not downloaded')")
+
+code("figure('dataset_variants.png')")
+
+md("*The three variants of the same physical leaves. `segmented` is what makes the background experiments in Section 6 possible — and the uniform backdrops visible in the colour column are exactly what the probe in Section 4.2 goes looking for.*")
 
 # --------------------------------------------------------------------- 4. EDA
 md("## 4. Exploratory data analysis",
@@ -234,12 +259,21 @@ md("## 5. Models and methods",
    "| Trained on `segmented` | background removed entirely | also the clean control for E4 |",
    "| Trained on `grayscale` | colour removed | how much of the signal is colour? |",
    "",
-   "### 5.4 Severity estimation (E12–E14)",
+   "### 5.4 Severity estimation (E12–E14, E25–E26)",
    "",
    "PlantVillage has no severity labels, so severity is derived from image features:",
    "the leaf is segmented (Otsu on saturation, or the official mask), lesion pixels are",
    "the leaf pixels outside the healthy-green hue band, and the lesion-area fraction is",
-   "bucketed into ordinal grades.")
+   "bucketed into ordinal grades at [0.005, 0.05, 0.20].",
+   "",
+   "That classical estimator needs a mask at inference time, so it is not yet part of the",
+   "network. The delivered model therefore **expands the classifier** as the brief asks: a",
+   "second linear head on the shared ResNet-18 backbone regresses √(lesion ratio) through",
+   "a sigmoid, trained jointly with the classification objective under a masked MSE loss",
+   "(weight 10) so that leaves without a cached ratio contribute only to the classification",
+   "term. At inference, one forward pass returns both the class and the severity, and the",
+   "grade uses the same rubric bands. E25 is the ablation that motivates joint training: the",
+   "same head *probed* on a frozen classification backbone instead of trained with it.")
 
 code("from src.models import build_model",
     "",
@@ -255,18 +289,34 @@ md("## 6. Results",
    "",
    "### 6.1 RQ1 — laboratory performance (E1, E2)")
 
+md("Reported on the held-out **leaf-grouped** test split of n = 8,215 images. The",
+   "ensemble row is the fixed-weight soft vote `[0.2, 0.5, 0.3]` used for every",
+   "headline number in this project (`eval_plantvillage.json`). A separate",
+   "validation-tuned search returns `[0.5, 0.15, 0.35]` and 99.54%; the two agree to",
+   "0.01 points, and we quote the fixed-weight arm throughout so that the per-disease",
+   "and confusion-matrix figures below come from the same model.")
+
 code("lab = load('eval_plantvillage.json')",
-    "hist = {m: load(f'{m}_history.json') for m in ['custom_cnn', 'resnet18', 'mobilenet_v2', 'ensemble']}",
+    "hist = {m: load(f'{m}_history.json') for m in ['custom_cnn', 'resnet18', 'mobilenet_v2']}",
     "rows = []",
     "for m, h in hist.items():",
     "    if not h: continue",
     "    t = h['test_metrics']",
     "    rows.append({'model': m, 'accuracy': t['accuracy'], 'precision': t['precision_macro'],",
     "                 'recall': t['recall_macro'], 'f1': t['f1_macro']})",
+    "if lab:",
+    "    rows.append({'model': 'ensemble (0.2/0.5/0.3)', 'accuracy': lab['ensemble'] / 100,",
+    "                 'precision': None, 'recall': None, 'f1': None})",
     "pd.DataFrame(rows).set_index('model').round(4) if rows else print('run the pipeline first')")
 
-md("The brief asks for **healthy vs diseased**. Because no ensemble error crosses that",
-   "boundary, the binary task is solved outright:")
+code("figure('learning_curves.png')")
+
+md("*Training histories. MobileNet-V2 is at 98% validation accuracy after a single epoch and the remaining 29 epochs buy 1.5 points — the benchmark is close to solved before training properly begins. The custom CNN, with no ImageNet initialisation, starts 24 points lower and still converges to 98.6%. Nothing here is overfitting: validation tracks training throughout, which is what makes the field results in Section 6.2 surprising.*")
+
+md("The brief asks for **healthy vs diseased**. Collapsing the 38 classes to two, the",
+   "ensemble reaches **99.96%** — not a perfect 100%, because three of its 39 errors do",
+   "cross that boundary, and two of those are diseased leaves called healthy, which is",
+   "the costlier direction for a farmer:")
 
 code("import itertools",
     "def binary_accuracy(tag, n=8215):",
@@ -322,9 +372,20 @@ md("**Reading the table.** The same leaves, with only the background masked out,
    "explains why — a large share of the evidence the model uses lies outside the leaf.",
    "",
    "We also tested whether this can be patched at inference (E7): horizontal-flip TTA",
-   "and AdaBN (recomputing BatchNorm statistics on the field images). Neither helps,",
-   "which is itself informative — the failure is a **learned shortcut**, not a",
-   "distribution-statistics mismatch, so it has to be fixed during training.")
+   "and AdaBN (recomputing BatchNorm statistics on the field images).")
+
+code("ad = load('adaptation_probe.json')",
+    "if ad:",
+    "    display(pd.DataFrame(ad).T.rename(columns={'open_38way': 'PlantDoc 38-way (%)',",
+    "                                               'closed_27way': 'restricted to 27 reachable (%)'}))",
+    "else:",
+    "    print('run: python -m scripts.audit --probe adaptation')")
+
+md("**Neither test-time fix helps — both make it worse.** TTA costs 0.4 points and AdaBN",
+   "0.9; recomputing BatchNorm statistics on the target domain, which repairs an ordinary",
+   "covariate shift, actively hurts here. That is the informative part: the failure is a",
+   "**learned shortcut**, not a distribution-statistics mismatch, so nothing applied at",
+   "inference can repair it and it has to be fixed during training.")
 
 code("figure('lab_vs_field.png')")
 
@@ -333,7 +394,13 @@ md("*The same ensemble on studio and field photographs: fine-grained accuracy co
 md("### 6.3 Closing the gap (E8–E11)",
    "",
    "Each row below is a training run; `p=0.0` is the control that separates *stronger",
-   "augmentation* from *removing the shortcut*.")
+   "augmentation* from *removing the shortcut*.",
+   "",
+   "> **Sample size.** The PlantDoc column here is the 236-image field **test split**,",
+   "> which is what `scripts/train.py` reports at the end of a run. Section 6.4 onward",
+   "> scores the same arms on **all 2,525** field images. The two bases differ by six to",
+   "> nine points and even reorder the arms, so numbers are never compared across them;",
+   "> every table states its own *n*.")
 
 code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "        ('resnet18_color_strong_p70_224',  'background randomised p=0.7'),",
@@ -345,8 +412,8 @@ code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "    h = load(f'{tag}_history.json')",
     "    if not h: continue",
     "    rows.append({'setting': label,",
-    "                 'PlantVillage': round(h['test_metrics']['accuracy'] * 100, 2),",
-    "                 'PlantDoc (field)': round(h['plantdoc_accuracy'], 2) if h.get('plantdoc_accuracy') else None,",
+    "                 'PlantVillage (n=8,215)': round(h['test_metrics']['accuracy'] * 100, 2),",
+    "                 'PlantDoc (n=236)': round(h['plantdoc_accuracy'], 2) if h.get('plantdoc_accuracy') else None,",
     "                 'epochs': len(h['history'])})",
     "pd.DataFrame(rows).set_index('setting') if rows else print('training still running')")
 
@@ -392,13 +459,22 @@ md("### 6.5 Where the field accuracy goes, and how much data closes it (E11, E16
    "bottleneck is recognising the plant, not the disease. Supervised adaptation is the",
    "honest fix — and reported separately, because it uses target-domain labels.")
 
-code("d = load('eval_arm_bg_random.json')",
-    "if d:",
-    "    print(f\"zero-shot decomposition (bg-random, 2,525 field images):\")",
+code("# decompose the BEST zero-shot arm on the 2,525-image basis, chosen by 38-way accuracy",
+    "arms = {'strong aug only': 'bg_control', 'background randomised': 'bg_random',",
+    "        'frozen backbone': 'frozen_ctrl', 'frozen + bg-random': 'frozen_bg',",
+    "        'hierarchical head': 'hier'}",
+    "scored = {k: load(f'eval_arm_{v}.json') for k, v in arms.items()}",
+    "scored = {k: v for k, v in scored.items() if v}",
+    "best = max(scored, key=lambda k: scored[k]['ensemble']) if scored else None",
+    "if best:",
+    "    d = scored[best]",
+    "    print(f'best zero-shot arm on all 2,525 field images: {best}')",
     "    print(f\"  all 38 classes   {d['ensemble']:.2f}%\")",
     "    print(f\"  crop only        {d['ensemble_crop']:.2f}%\")",
     "    print(f\"  disease | crop   {d['ensemble_disease_given_crop']:.2f}%\")",
     "    print(f\"  healthy/diseased {d['ensemble_binary']:.2f}%\")",
+    "    print(f\"  check: {d['ensemble_crop']/100:.4f} x {d['ensemble_disease_given_crop']/100:.4f}\"",
+    "          f\" = {d['ensemble_crop']*d['ensemble_disease_given_crop']/10000:.4f}\")",
     "curve = [(5,'ft_shots5'),(20,'ft_robust'),(50,'ft_shots50'),(100,'ft_shots100'),('all','ft_full')]",
     "pts = [(s, load(f'{t}_history.json')) for s,t in curve]",
     "pts = [(s,d['best']) for s,d in pts if d]",
@@ -415,6 +491,11 @@ md("### 6.6 RQ3 — severity from image features (E12–E14, E26)")
 code("sev = load('severity_probe.json')",
     "val = load('severity_validation.json')",
     "if sev:",
+    "    print('E12 — leaf segmentation quality (unsupervised HSV mask vs the official mask):')",
+    "    print(f\"  Dice mean {sev['leaf_segmentation_dice_mean']:.3f} | \"",
+    "          f\"median {sev['leaf_segmentation_dice_median']:.3f} | \"",
+    "          f\"{100*sev['leaf_segmentation_dice_below_0.5']:.0f}% of leaves below 0.5\")",
+    "    print()",
     "    print(f\"ROC-AUC healthy vs diseased, Otsu mask     : {sev['auc_otsu_mask']:.3f}\")",
     "    print(f\"ROC-AUC healthy vs diseased, official mask : {sev['auc_official_mask']:.3f}\")",
     "    print(f\"mean lesion ratio  healthy {sev['mean_ratio_healthy_official']:.3f} "
@@ -452,6 +533,162 @@ md("Three findings, reported honestly:",
 code("figure('severity.png')")
 
 md("*Severity. Left: the grade against three annotators, with their mutual agreement as the ceiling. Right: trained jointly with the classifier, severity becomes a model output that beats the classical estimator.*")
+
+md("A caution on the E25 probe. Its **AUC of 0.936 looks excellent and is misleading**:",
+   "healthy-versus-diseased is largely answerable from class identity, and a head reading",
+   "classifier features can name the class and emit that class's typical lesion ratio",
+   "without ever measuring the leaf in front of it. Within a single class — where class",
+   "identity carries no information — it reaches only rho 0.380 against the classical",
+   "estimator's 0.784. That gap is why we report within-class correlation rather than AUC.")
+
+# ---------------------------------------------------- 6.7 negative and secondary results
+md("### 6.7 Results that did not work, and the deployment profile (E17, E21)",
+   "",
+   "Two arms produced negative results. They are reported because the pre-registered",
+   "falsification conditions in [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md) said they",
+   "would be; E7's negative result is in Section 6.2, where it belongs.")
+
+code("pair = load('paired_bg_random_vs_hier.json')",
+    "if pair:",
+    "    rows = []",
+    "    for task, label in [('all_38', '38-way disease'), ('crop', 'crop species'),",
+    "                        ('binary', 'healthy/diseased')]:",
+    "        d = pair[task]",
+    "        rows.append({'task': label, 'flat head (%)': d['accuracy_a'],",
+    "                     'hierarchical (%)': d['accuracy_b'],",
+    "                     'net images gained': d['net_gain_b'],",
+    "                     'discordant': d['discordant'], 'McNemar p': d['p_value']})",
+    "    display(pd.DataFrame(rows).set_index('task').style.format(",
+    "        {'McNemar p': '{:.3g}', 'flat head (%)': '{:.2f}', 'hierarchical (%)': '{:.2f}'}))",
+    "    print(f\"paired on the same {pair['n']:,} field images; both arms use background randomisation\")")
+
+md("**E17 — the hierarchical head is rejected (H9).** The decomposition in Section 6.5",
+   "showed that crop identification is the bottleneck, so making crop an explicit",
+   "sub-problem was predicted to lift crop accuracy towards ~60% and overall accuracy to",
+   "~31%. It gains 0.84 points on crop — 21 images out of 325 discordant ones, p = 0.27,",
+   "indistinguishable from chance — leaves 38-way flat (p = 0.94), and loses 71 images on",
+   "healthy/diseased, which *is* significant and in the wrong direction. It also finishes",
+   "below simply freezing the backbone (16.79% against 18.06%). The pre-registered",
+   "magnitude condition is not met, so H9 is recorded as rejected rather than softened.")
+
+code("rob = load('field_robustness.json')",
+    "if rob:",
+    "    rows = []",
+    "    for metric, arms in rob.items():",
+    "        for arm, v in arms.items():",
+    "            lo, mid, hi_ = v['per_bin_accuracy']",
+    "            rows.append({'capture metric': metric, 'arm': arm, 'low third': lo,",
+    "                         'middle': mid, 'high third': hi_, 'high - low': v['high_minus_low']})",
+    "    display(pd.DataFrame(rows).set_index(['capture metric', 'arm']))",
+    "else:",
+    "    print('run: python -m scripts.field_robustness')")
+
+md("**E21 — strong augmentation buys no robustness to capture quality (H11 rejected), but",
+   "the finding is more useful than the hypothesis.** Field images were split into thirds",
+   "by luminance, contrast and sharpness. Accuracy is flat across luminance and contrast",
+   "for both arms (every gap under 1.6 points, and the sign is inconsistent). Sharpness is",
+   "the one axis that moves — and it moves the *wrong* way: the strong-augmentation arm",
+   "gains 3.7 points from blurry to sharp where the standard arm gains 0.1, so heavier",
+   "augmentation made it **more** sensitive to blur, not less.",
+   "",
+   "The useful part is what this rules out. Bright, dark and low-contrast photographs are",
+   "classified about as badly as clean ones, so the ~16% field accuracy is **not caused by",
+   "poor photography** — no amount of telling farmers to hold the camera steadier would",
+   "recover it. What remains is the compositional gap: whole plants instead of one detached",
+   "leaf, overlapping foliage, and varying scale.")
+
+code("eff = load('efficiency_probe.json')",
+    "if eff:",
+    "    rows = {k: v for k, v in eff.items() if isinstance(v, dict)}",
+    "    df = pd.DataFrame(rows).T",
+    "    df.columns = ['parameters (M)', 'checkpoint (MB)', 'latency (ms/img)', 'throughput (img/s)']",
+    "    display(df)",
+    "    print(f\"measured on {eff.get('device')} at {eff.get('image_size')}x{eff.get('image_size')}\")")
+
+md("**Deployment profile.** MobileNet-V2 stores in 9.3 MB against ResNet-18's 44.9 MB and",
+   "scores *higher* in the laboratory (99.46% vs 99.33%), so on size alone it is the",
+   "sensible thing to ship. Its GPU latency is worse, not better — 2.68 ms against 1.40 ms —",
+   "because depthwise-separable convolutions trade arithmetic for memory traffic, which a",
+   "GPU is the wrong device to reward; the parameter count is a size argument, not a speed",
+   "one. All three run far faster than any farmer would notice.",
+   "",
+   "The sharper efficiency result is E15's: a frozen backbone with a 19,494-parameter linear",
+   "head is **78 KB per crop** on top of one shared backbone — 574× fewer trainable",
+   "parameters than fine-tuning — and it loses nothing in the field, where it is in fact the",
+   "better model.")
+
+# ------------------------------------------------------- 6.8 end-to-end example
+md("### 6.8 End to end: what the system returns for one leaf",
+   "",
+   "Everything above is aggregate. This runs the delivered model — the jointly trained",
+   "network from E26 — over held-out test leaves it has never seen, and prints what a",
+   "user would actually receive: crop, condition, healthy/diseased, confidence, and a",
+   "severity grade produced by the network itself rather than by a mask.")
+
+code("import torch.nn.functional as F",
+    "from PIL import Image",
+    "from src.data import build_transforms, parse_class_name",
+    "from src.audit.severity import severity_level",
+    "from scripts.train_joint import JointModel",
+    "",
+    "ckpt_path = OUT / 'joint_model.pth'",
+    "if ckpt_path.exists():",
+    "    ckpt = torch.load(ckpt_path, map_location=device, weights_only=False)",
+    "    classes = ckpt['classes']",
+    "    model = JointModel(cfg.model.name, len(classes), pretrained=False).to(device)",
+    "    model.load_state_dict(ckpt['model'])",
+    "    model.eval()",
+    "    tf = build_transforms(224, train=False)",
+    "",
+    "    # three healthy and three diseased, so both branches of the rubric are visible",
+    "    rng = np.random.default_rng(cfg.seed)",
+    "    by_status = {True: [], False: []}",
+    "    for i in test_idx:",
+    "        by_status['healthy' in base.classes[base.samples[i][1]].lower()].append(i)",
+    "    picks = np.concatenate([rng.choice(by_status[s], size=3, replace=False) for s in (True, False)])",
+    "",
+    "    fig, axes = plt.subplots(2, 3, figsize=(11.5, 7.6))",
+    "    for ax, i in zip(axes.ravel(), picks):",
+    "        path, label = base.samples[int(i)]",
+    "        img = Image.open(path).convert('RGB')",
+    "        with torch.no_grad():",
+    "            logits, sev = model(tf(img).unsqueeze(0).to(device))",
+    "        conf, idx = F.softmax(logits, 1)[0].max(0)",
+    "        crop, condition, healthy = parse_class_name(classes[int(idx)])",
+    "        # the head regresses sqrt(lesion ratio) through a sigmoid, so invert both",
+    "        ratio = float(torch.sigmoid(sev).item()) ** 2",
+    "        grade = severity_level(ratio, cfg.severity.thresholds, cfg.severity.levels)",
+    "        flag = '' if int(idx) == label else f\"   MISREAD (true: {classes[label]})\"",
+    "        ax.imshow(img); ax.set_xticks([]); ax.set_yticks([])",
+    "        ax.set_title(f\"{crop.replace('_', ' ')} - {condition.replace('_', ' ')}\\n\"",
+    "                     f\"{'HEALTHY' if healthy else 'DISEASED'}  conf {conf:.3f}\\n\"",
+    "                     f\"lesion area {100*ratio:.1f}% -> severity: {grade}{flag}\",",
+    "                     fontsize=9, loc='left')",
+    "    fig.tight_layout()",
+    "    plt.show()",
+    "else:",
+    "    print('run: python -m scripts.train_joint')")
+
+md("Each caption is one complete answer to the brief: the crop, its condition, the",
+   "healthy/diseased verdict, a confidence, and a severity grade — all from a single",
+   "forward pass through one network, using the same rubric bands",
+   "(`src.audit.severity.severity_level`) as every severity number above.",
+   "",
+   "Three honest observations from these six.",
+   "",
+   "1. The grade is deliberately **not** gated on the predicted class — it is read straight",
+   "   off the regression head, so a leaf called healthy that carries visible lesions is",
+   "   still graded, which is what you want when the classifier is the part that is wrong.",
+   "2. The healthy leaves come back at a few percent lesion area rather than zero, landing",
+   "   in *mild* rather than *healthy*. That is not a bug in the head — it is faithfully",
+   "   reproducing its target, and the official masks themselves give healthy leaves a mean",
+   "   ratio of 0.039 (Section 6.6). Leaf edge, shadow and specular highlight fall outside",
+   "   the healthy-green hue band. It is why the rubric's lowest threshold is 0.005 and not 0.",
+   "3. The yellow-leaf-curl leaf is graded *mild* at 0.8% while looking obviously sick. It",
+   "   is right about the area and wrong about the plant: that virus deforms and discolours",
+   "   the whole leaf instead of producing lesions. **Lesion area is the wrong measure for",
+   "   this disease**, and no amount of better regression fixes that — it is a limit of the",
+   "   definition of severity, which is the honest reading of the kappa ceiling in E14.")
 
 # ------------------------------------------------------------- 7. Discussion
 md("## 7. Discussion",
