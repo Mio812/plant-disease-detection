@@ -74,14 +74,29 @@ def parse_report(path):
     return rows
 
 
+ABBREV = {
+    "Cercospora leaf spot Gray leaf spot": "Gray leaf spot",
+    "Haunglongbing Citrus greening": "Citrus greening",
+    "Leaf blight Isariopsis Leaf Spot": "Leaf blight",
+    "Esca Black Measles": "Esca",
+    "Spider mites Two-spotted spider mite": "Spider mites",
+    "Yellow Leaf Curl Virus": "Yellow leaf curl",
+    "mosaic virus": "Mosaic virus",
+    "Northern Leaf Blight": "Northern leaf blight",
+    "Cedar apple rust": "Cedar rust",
+}
+
+
 def short(cls):
+    """Axis label: drop the crop name where the disease repeats it, and abbreviate
+    the few very long names that otherwise dominate a 38-label axis."""
     crop, _, dis = cls.partition("___")
     crop = crop.replace("_(maize)", "").replace("_(including_sour)", "").replace(",_bell", "")
-    dis = dis.replace("_", " ").replace("(", "").replace(")", "")
-    dis = re.sub(r"\s+", " ", dis).strip()
-    if dis.lower() == "healthy":
-        return f"{crop} · healthy"
-    return f"{crop} · {dis[:26]}"
+    dis = re.sub(r"\s+", " ", dis.replace("_", " ").replace("(", "").replace(")", "")).strip()
+    if dis.lower().startswith(crop.lower()):
+        dis = dis[len(crop):].strip()
+    dis = ABBREV.get(dis, dis)
+    return f"{crop} · {dis.lower() if dis.lower() == 'healthy' else dis}"
 
 
 # --------------------------------------------------------------- 1. confusion matrix
@@ -101,11 +116,11 @@ def fig_confusion():
     row = cm.sum(1, keepdims=True)
     norm = np.divide(cm, row, out=np.zeros_like(cm), where=row > 0)
 
-    fig, ax = plt.subplots(figsize=(9.6, 8.6))
+    fig, ax = plt.subplots(figsize=(7.8, 7.0))
     im = ax.imshow(norm, cmap=BLUES, norm=PowerNorm(gamma=0.4, vmin=0, vmax=1))
     ax.set_xticks(range(n)); ax.set_yticks(range(n))
-    ax.set_xticklabels([short(c) for c in classes], rotation=90, fontsize=5.6)
-    ax.set_yticklabels([short(c) for c in classes], fontsize=5.6)
+    ax.set_xticklabels([short(c) for c in classes], rotation=90, fontsize=7.0)
+    ax.set_yticklabels([short(c) for c in classes], fontsize=7.0)
     ax.set_xlabel("predicted", color=INK2); ax.set_ylabel("true", color=INK2)
     ax.set_title("Ensemble confusion matrix — PlantVillage test (row-normalised)",
                  color=INK, fontsize=11, fontweight="bold", loc="left", pad=30)
@@ -113,14 +128,14 @@ def fig_confusion():
     for i in range(n):
         for j in range(n):
             if i != j and cm[i, j] > 0:
-                ax.text(j, i, int(cm[i, j]), ha="center", va="center", fontsize=5.2, color=RED)
-    cb = fig.colorbar(im, ax=ax, fraction=0.035, pad=0.02)
+                ax.text(j, i, int(cm[i, j]), ha="center", va="center", fontsize=6.4,
+                        color=RED, fontweight="bold")
+    cb = fig.colorbar(im, ax=ax, fraction=0.026, pad=0.015)
     cb.set_label("share of true class", color=INK2, fontsize=8)
     cb.ax.tick_params(labelsize=7, color=MUTED)
     cb.outline.set_edgecolor(AXIS)
-    ax.text(0, 1.008, "39 errors in 8,215 images; red digits are misclassified counts. Three cross "
-                      "the healthy/diseased boundary — two diseased leaves called healthy.",
-            transform=ax.transAxes, fontsize=8.5, color=INK2, va="bottom")
+    ax.text(0, 1.008, "39 errors in 8,215 images; red digits are the misclassified counts.",
+            transform=ax.transAxes, fontsize=8, color=INK2, va="bottom")
     save(fig, "confusion_matrix.png")
 
 
@@ -220,9 +235,9 @@ def fig_per_disease():
     accs = [v[0] * 100 for _, v in items]
     colors = [RED if a < 99 else BLUE for a in accs]
 
-    fig, ax = plt.subplots(figsize=(7.0, 8.2))
-    ax.barh(range(len(names)), accs, color=colors, height=0.72)
-    ax.set_yticks(range(len(names))); ax.set_yticklabels(names, fontsize=6.6)
+    fig, ax = plt.subplots(figsize=(7.2, 7.4))
+    ax.barh(range(len(names)), accs, color=colors, height=0.74)
+    ax.set_yticks(range(len(names))); ax.set_yticklabels(names, fontsize=7.4)
     ax.set_xlim(0, 108); ax.set_xticks([0, 25, 50, 75, 100])
     ax.invert_yaxis()
     ax.grid(axis="x", color=GRID, linewidth=0.6); ax.set_axisbelow(True)
@@ -231,7 +246,7 @@ def fig_per_disease():
                  color=INK, fontsize=10.5, fontweight="bold", loc="left", pad=10)
     for i, a in enumerate(accs):
         if a < 99:
-            ax.text(a + 1.5, i, f"{a:.0f}%", va="center", fontsize=7, color=RED)
+            ax.text(a + 1.5, i, f"{a:.0f}%", va="center", fontsize=7.6, color=RED, fontweight="bold")
     n_perfect = sum(1 for a in accs if a >= 99.5)
     n_weak = sum(1 for a in accs if a < 99)
     fig.text(0.5, -0.012,
@@ -340,6 +355,73 @@ def fig_architecture():
             fontsize=8.5, color=INK2)
     save(fig, "architecture.png")
 
+
+
+# ------------------------------------- 8. dataset composition (Data Analysis slide)
+def fig_dataset():
+    """Replaces the four-donut slide. Each quantity gets the form that fits it:
+    a ratio is not a part-to-whole, so it is not a ring."""
+    from torchvision.datasets import ImageFolder
+    from src.config import Config
+    from src.data import splits_from_config
+
+    cfg = Config.load("configs/default.yaml")
+    base = ImageFolder(cfg.data.root)
+    counts = np.bincount([l for _, l in base.samples])
+    healthy = sum(int(c) for c, n in zip(counts, base.classes) if "healthy" in n.lower())
+    total = int(counts.sum())
+    tr, va, te = (len(s) for s in splits_from_config(cfg, base))
+
+    fig, axes = plt.subplots(2, 2, figsize=(11.0, 5.4))
+
+    # A — class sizes: the skew is the message, so show every class
+    ax = axes[0, 0]
+    order = np.argsort(counts)[::-1]
+    ax.bar(range(len(counts)), counts[order], color=BLUE, width=0.86)
+    ax.set_xticks([]); ax.set_ylabel("images", color=INK2)
+    ax.annotate(f"largest {counts.max():,}", (0, counts.max()), xytext=(4, -2),
+                textcoords="offset points", fontsize=8, color=INK)
+    ax.annotate(f"smallest {counts.min():,}", (len(counts) - 1, counts.min()),
+                xytext=(-6, 14), textcoords="offset points", fontsize=8, color=RED, ha="right")
+    style(ax, title=f"Class imbalance — {counts.max() / counts.min():.0f}:1 across 38 classes")
+
+    def stacked(ax, parts, colours, title):
+        left = 0
+        for (label, value), colour in zip(parts, colours):
+            ax.barh([0], [value], left=left, color=colour, height=0.42)
+            ax.text(left + value / 2, 0, f"{label}\n{100 * value / total_of(parts):.0f}%",
+                    ha="center", va="center", fontsize=8.5, color="white", fontweight="bold")
+            left += value
+        ax.set_xlim(0, left); ax.set_ylim(-0.5, 0.5)
+        ax.set_yticks([]); ax.set_xticks([])
+        for side in ("left", "bottom"):
+            ax.spines[side].set_visible(False)
+        ax.set_title(title, color=INK, fontsize=10.5, fontweight="bold", loc="left", pad=10)
+
+    def total_of(parts):
+        return sum(v for _, v in parts)
+
+    stacked(axes[0, 1], [("diseased", total - healthy), ("healthy", healthy)],
+            [ORANGE, AQUA], "Label balance")
+    stacked(axes[1, 0], [("train", tr), ("val", va), ("test", te)],
+            [BLUE, "#86b6ef", "#cde2fb"], "Data split — grouped by leaf")
+    axes[1, 0].texts[-1].set_color(INK)
+    axes[1, 0].texts[-2].set_color(INK)
+
+    # D — leakage is a change, so show before and after
+    ax = axes[1, 1]
+    bars = ax.bar(["random split", "leaf-grouped split"], [74.7, 0.0],
+                  color=[RED, AQUA], width=0.5)
+    for b, v in zip(bars, [74.7, 0.0]):
+        ax.text(b.get_x() + b.get_width() / 2, v + 2.5, f"{v:.1f}%", ha="center",
+                fontsize=9.5, color=INK, fontweight="bold")
+    ax.set_ylim(0, 92); ax.set_yticks([0, 25, 50, 75])
+    style(ax, ylabel="test images with a\nsame-leaf twin in train",
+          title="Train/test leakage, before and after")
+
+    fig.tight_layout(h_pad=2.4, w_pad=3.0)
+    save(fig, "dataset_composition.png")
+
 if __name__ == "__main__":
     print(f"writing figures to {FIG}/")
     fig_confusion()
@@ -349,3 +431,4 @@ if __name__ == "__main__":
     fig_per_disease()
     fig_severity()
     fig_architecture()
+    fig_dataset()
