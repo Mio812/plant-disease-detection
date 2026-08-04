@@ -34,14 +34,10 @@ md("# Automatic Plant Disease Detection Using Computer Vision",
    "",
    "## 1. Introduction, motivation and problem statement",
    "",
-   "Plant diseases reduce agricultural productivity and threaten food security.",
-   "Expert visual inspection is slow, subjective and does not scale, so the project",
-   "brief asks for a CNN that classifies leaves as healthy or diseased and estimates",
-   "disease severity, *\"to aid farmers and agricultural experts in timely",
-   "intervention\"*.",
-   "",
-   "That closing phrase is a deployment claim, and it shapes the whole study. We",
-   "therefore ask three questions:",
+   "The brief asks for a CNN that classifies leaves as healthy or diseased and",
+   "estimates disease severity, *\"to aid farmers and agricultural experts in timely",
+   "intervention\"*. That closing phrase is a deployment claim, so we ask three",
+   "questions:",
    "",
    "| | Question | Brief |",
    "|---|---|---|",
@@ -49,30 +45,22 @@ md("# Automatic Plant Disease Detection Using Computer Vision",
    "| **RQ2** | Does that accuracy mean the system would work on real field photographs? | implied by the stated aim |",
    "| **RQ3** | Can severity be estimated from image features, and is the estimate trustworthy? | Task 2 |",
    "",
-   "RQ1 turns out to be easy — and that is precisely why RQ2 matters. The full",
-   "hypothesis list and experiment matrix are in [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md);",
-   "experiment ids (E1–E26) used below refer to it.",
+   "RQ1 turns out to be easy — which is why RQ2 matters. Full hypothesis list and",
+   "experiment matrix: [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md).",
    "",
-   "> **How to read and how to re-run this notebook.** Every cell below is stored with",
-   "> its output, so the notebook can be read start to finish as a standalone document.",
-   "> The heavy work — 20+ training runs — is **not** repeated here: those results are",
-   "> loaded from the committed `outputs/*.json` artefacts, which is also what lets any",
-   "> number in this notebook be traced back to the run that produced it. Only the cheap",
-   "> analyses recompute live.",
-   ">",
-   "> To execute it yourself you need the repository *and* the datasets, which are too",
-   "> large to ship inside a notebook:",
+   "> **Reading and re-running.** Outputs are stored, so this reads standalone. Training",
+   "> runs are not repeated — results load from the committed `outputs/*.json`, which is",
+   "> what lets every number be traced to the run that produced it. To execute it you need",
+   "> the repository *and* the datasets:",
    ">",
    "> ```bash",
    "> git clone https://github.com/Mio812/plant-disease-detection && cd plant-disease-detection",
    "> uv sync",
    "> python -m scripts.prepare_data --dataset both   # PlantVillage + PlantDoc",
-   "> jupyter lab notebooks/plant_disease_detection.ipynb",
+   "> python -m tools.build_notebook --execute",
    "> ```",
    ">",
-   "> Reproducing the training runs themselves is `python -m scripts.run_all` (several",
-   "> GPU-hours). Cells that need a missing artefact print the exact command that",
-   "> produces it instead of failing.")
+   "> Reproducing the training runs is `python -m scripts.run_all` (several GPU-hours).")
 
 md("## 2. Setup")
 
@@ -126,16 +114,13 @@ code("import os",
 # ------------------------------------------------------------ 3. Data sources
 md("## 3. Data sources",
    "",
-   "**PlantVillage** (Hughes & Salathé, 2015) is the training corpus: 54,305 colour",
-   "leaf photographs, 14 crop species, 38 crop/condition classes, captured under",
-   "controlled laboratory conditions on uniform backgrounds. The repository also",
-   "ships `grayscale` and `segmented` (background-removed) versions of every image,",
-   "and we use all three.",
+   "**PlantVillage** (Hughes & Salathé, 2015) — the training corpus: 54,305 leaf",
+   "photographs, 14 crops, 38 crop/condition classes, shot in a laboratory on uniform",
+   "backgrounds. Every leaf also ships as `grayscale` and `segmented`; we use all three.",
    "",
-   "**PlantDoc** (Singh et al., 2020, CC BY 4.0) supplies the reality check: ~2,600",
-   "in-the-wild photographs scraped from the internet, with cluttered backgrounds and",
-   "several leaves per image. We never train on it in the zero-shot experiments — it",
-   "is used only to ask whether a PlantVillage model transfers.",
+   "**PlantDoc** (Singh et al., 2020, CC BY 4.0) — the reality check: 2,525 in-the-wild",
+   "photographs with cluttered backgrounds and several leaves per image. Never trained",
+   "on in any zero-shot experiment.",
    "",
    "Both are fetched by `python -m scripts.prepare_data --dataset both`.")
 
@@ -154,14 +139,14 @@ code("base = ImageFolder(cfg.data.root)",
 
 code("figure('dataset_variants.png')")
 
-md("*The three variants of the same physical leaves. `segmented` is what makes the background experiments in Section 6 possible — and the uniform backdrops visible in the colour column are exactly what the probe in Section 4.2 goes looking for.*")
+md("*The three variants of the same physical leaves. `segmented` is what makes the background experiments possible; the uniform backdrops in the colour column are what the probe in 4.2 goes looking for.*")
 
 # --------------------------------------------------------------------- 4. EDA
 md("## 4. Exploratory data analysis",
    "",
-   "Three things matter before modelling: how imbalanced the classes are, how the",
-   "healthy/diseased split falls, and — the finding that shaped this project — how",
-   "much label information sits in the **background** rather than the leaf.")
+   "Three things matter before modelling: class imbalance, the healthy/diseased",
+   "balance, and how much label information sits in the **background** rather than",
+   "the leaf.")
 
 md("### 4.1 Class distribution")
 
@@ -177,20 +162,16 @@ code("df = pd.DataFrame(sorted(counts.items(), key=lambda kv: -kv[1]), columns=[
 code("fig = visualize.plot_class_distribution(counts, top=20)",
     "plt.show()")
 
-md("Two consequences for the experimental design:",
-   "",
-   "1. The imbalance is roughly **36:1**, so accuracy alone would be misleading —",
-   "   every result below also reports **macro** precision, recall and F1.",
-   "2. Only ~28% of images are healthy leaves, so the healthy/diseased decision the",
-   "   brief asks for is the easier direction; the fine-grained disease label is the",
-   "   hard part.")
+md("Imbalance is roughly **36:1**, so every result below also reports **macro**",
+   "precision, recall and F1. Only ~28% of images are healthy, making the",
+   "healthy/diseased decision the easier direction; the fine-grained label is the hard",
+   "part.")
 
-md("### 4.2 What is in the background? (E3)",
+md("### 4.2 What is in the background?",
    "",
-   "PlantVillage images were captured in sessions, so the backdrop may correlate with",
-   "the class. We test this directly: take **8 border pixels** — no leaf at all — and",
-   "train a logistic regression on them. If the background carries no label",
-   "information the accuracy should sit near chance, 1/38 = 2.6%.")
+   "The images were captured in sessions, so the backdrop may correlate with the class.",
+   "We train a logistic regression on **8 border pixels** — no leaf at all. If the",
+   "background carries no label information, accuracy should sit near chance, 1/38 = 2.6%.")
 
 code("probe = load('bias_probe.json')",
     "if probe:",
@@ -201,27 +182,22 @@ code("probe = load('bias_probe.json')",
     "else:",
     "    print('run: python -m scripts.audit --probe background')")
 
-md("This is the pivotal result of the exploratory phase. A classifier that never",
-   "sees a leaf still recovers a large share of the label, which means any headline",
-   "accuracy on this dataset is partly measuring **capture bias**. Everything in",
-   "Section 6 follows from it.")
+md("A classifier that never sees a leaf recovers a large share of the label, so any",
+   "headline accuracy on this dataset is partly measuring **capture bias**. Everything",
+   "in Section 6 follows from this.")
 
 md("### 4.3 Test-set integrity — leaf grouping",
    "",
-   "PlantVillage photographs each physical leaf several times. `leaf-map.json`, shipped",
-   "with the dataset, records which images share a leaf. A naive random split scatters",
-   "those near-duplicates across train and test, so the test score partly rewards",
-   "recognising leaves already seen. We measured it: on a random split **74.7% of test",
-   "images had a same-leaf twin in training**. We therefore split by *leaf* — every",
-   "image of a leaf stays on one side — which removes the leakage (0% by construction)",
-   "and is the split used everywhere below.",
+   "Each physical leaf is photographed several times, and `leaf-map.json` (shipped with",
+   "the dataset) records which images share one. A naive random split scatters those",
+   "near-duplicates across train and test: we measured **74.7% of test images with a",
+   "same-leaf twin in training**. We therefore split by *leaf* — 0% leakage by",
+   "construction — and that is the split used everywhere below.",
    "",
-   "A perceptual re-check bounds what the map missed (a frozen ImageNet embedding,",
-   "calibrated against different-leaf-same-class pairs). It flags ~10.7% of test images,",
-   "but the same-leaf and same-class distributions overlap heavily, so this over-counts",
-   "PlantVillage's near-identical *distinct* leaves; the true residual is well below it.",
-   "The decisive check is that removing the known leakage cost only ~0.3 accuracy",
-   "points on the ensemble — structural leakage would have cost far more.")
+   "A perceptual re-check (frozen ImageNet embedding, calibrated against",
+   "different-leaf-same-class pairs) flags ~10.7% of test images, but the same-leaf and",
+   "same-class distributions overlap heavily, so it over-counts distinct look-alikes. The",
+   "decisive check: removing the known leakage cost only ~0.3 accuracy points.")
 
 code("res = load('residual_leakage.json')",
     "if res:",
@@ -233,10 +209,10 @@ code("res = load('residual_leakage.json')",
 # ---------------------------------------------------------- 5. Models/methods
 md("## 5. Models and methods",
    "",
-   "### 5.1 Three baselines (E1)",
+   "### 5.1 Three baselines",
    "",
-   "Three architectures spanning two families, all trained through one identical",
-   "pipeline so the comparison isolates the architecture:",
+   "Three architectures, one identical pipeline, so the comparison isolates the",
+   "architecture:",
    "",
    "| Model | Family | Rationale |",
    "|---|---|---|",
@@ -244,44 +220,38 @@ md("## 5. Models and methods",
    "| **ResNet-18** | ImageNet-pretrained | strong residual backbone of moderate size |",
    "| **MobileNet-V2** | ImageNet-pretrained | lightweight, representative of edge deployment |",
    "",
-   "Training: AdamW (lr 1e-3, weight decay 1e-4), cosine schedule, cross-entropy with",
-   "0.1 label smoothing, random resized crop / flip / ±20° rotation / colour jitter,",
-   "early stopping on validation accuracy. The backbone weights are the only",
-   "pre-existing component; the classifier heads and the pipeline are ours.",
+   "AdamW (lr 1e-3, weight decay 1e-4), cosine schedule, cross-entropy with 0.1 label",
+   "smoothing, random resized crop / flip / ±20° rotation / colour jitter, early stopping",
+   "on validation accuracy.",
    "",
-   "### 5.2 Proposed model: validation-tuned soft-voting ensemble (E2)",
+   "### 5.2 Proposed model: validation-tuned soft-voting ensemble",
    "",
-   "Our proposed model averages the members' softmax vectors with weights chosen by",
-   "grid search **on the validation split**, then applied unchanged to the test split,",
-   "so the tuning never sees test data.",
+   "Averages the members' softmax vectors with weights grid-searched **on validation**",
+   "and applied unchanged to test, so tuning never sees test data.",
    "",
-   "### 5.3 Removing the shortcut (E8–E10)",
+   "### 5.3 Removing the shortcut",
    "",
-   "Given the Section 4.2 finding, we retrain with interventions that make the",
-   "background uninformative, and compare them under one split:",
+   "Given 4.2, we retrain with interventions that make the background uninformative:",
    "",
    "| Intervention | What it changes | Role |",
    "|---|---|---|",
    "| Strong augmentation, `p=0.0` | heavier augmentation only | **control** — separates augmentation from de-shortcutting |",
    "| Background randomisation `p=0.7` | leaf composited onto a random background | the proposed fix |",
-   "| Trained on `segmented` | background removed entirely | also the clean control for E4 |",
+   "| Trained on `segmented` | background removed entirely | clean control for the masked evaluation |",
    "| Trained on `grayscale` | colour removed | how much of the signal is colour? |",
    "",
-   "### 5.4 Severity estimation (E12–E14, E25–E26)",
+   "### 5.4 Severity estimation",
    "",
-   "PlantVillage has no severity labels, so severity is derived from image features:",
-   "the leaf is segmented (Otsu on saturation, or the official mask), lesion pixels are",
-   "the leaf pixels outside the healthy-green hue band, and the lesion-area fraction is",
-   "bucketed into ordinal grades at [0.005, 0.05, 0.20].",
+   "PlantVillage has no severity labels, so severity is derived from image features: the",
+   "leaf is segmented (Otsu on saturation, or the official mask), lesion pixels are leaf",
+   "pixels outside the healthy-green hue band, and the lesion-area fraction is bucketed",
+   "into ordinal grades at [0.005, 0.05, 0.20].",
    "",
-   "That classical estimator needs a mask at inference time, so it is not yet part of the",
-   "network. The delivered model therefore **expands the classifier** as the brief asks: a",
-   "second linear head on the shared ResNet-18 backbone regresses √(lesion ratio) through",
-   "a sigmoid, trained jointly with the classification objective under a masked MSE loss",
-   "(weight 10) so that leaves without a cached ratio contribute only to the classification",
-   "term. At inference, one forward pass returns both the class and the severity, and the",
-   "grade uses the same rubric bands. E25 is the ablation that motivates joint training: the",
-   "same head *probed* on a frozen classification backbone instead of trained with it.")
+   "That estimator needs a mask at inference, so the delivered model **expands the",
+   "classifier** as the brief asks: a second linear head on the shared ResNet-18 backbone",
+   "regresses √(lesion ratio) through a sigmoid, trained jointly with the classification",
+   "objective under a masked MSE loss (weight 10). One forward pass returns both class",
+   "and severity, graded with the same bands.")
 
 code("from src.models import build_model",
     "",
@@ -295,14 +265,13 @@ code("from src.models import build_model",
 # ---------------------------------------------------------------- 6. Results
 md("## 6. Results",
    "",
-   "### 6.1 RQ1 — laboratory performance (E1, E2)")
+   "### 6.1 RQ1 — laboratory performance")
 
-md("Reported on the held-out **leaf-grouped** test split of n = 8,215 images. The",
-   "ensemble row is the fixed-weight soft vote `[0.2, 0.5, 0.3]` used for every",
-   "headline number in this project (`eval_plantvillage.json`). A separate",
-   "validation-tuned search returns `[0.5, 0.15, 0.35]` and 99.54%; the two agree to",
-   "0.01 points, and we quote the fixed-weight arm throughout so that the per-disease",
-   "and confusion-matrix figures below come from the same model.")
+md("Held-out **leaf-grouped** test split, n = 8,215. The ensemble row is the",
+   "fixed-weight soft vote `[0.2, 0.5, 0.3]` used for every headline number here",
+   "(`eval_plantvillage.json`); a validation-tuned search returns `[0.5, 0.15, 0.35]`",
+   "and 99.54%, agreeing to 0.01 points. We quote the fixed-weight arm throughout so",
+   "the figures below come from the same model.")
 
 code("lab = load('eval_plantvillage.json')",
     "hist = {m: load(f'{m}_history.json') for m in ['custom_cnn', 'resnet18', 'mobilenet_v2']}",
@@ -319,12 +288,11 @@ code("lab = load('eval_plantvillage.json')",
 
 code("figure('learning_curves.png')")
 
-md("*Training histories. MobileNet-V2 is at 98% validation accuracy after a single epoch and the remaining 29 epochs buy 1.5 points — the benchmark is close to solved before training properly begins. The custom CNN, with no ImageNet initialisation, starts 24 points lower and still converges to 98.6%. Nothing here is overfitting: validation tracks training throughout, which is what makes the field results in Section 6.2 surprising.*")
+md("*Training histories. MobileNet-V2 reaches 98% validation accuracy after one epoch and the remaining 29 buy 1.5 points — the benchmark is close to solved before training properly begins. Validation tracks training throughout, so nothing here is overfitting, which is what makes the field results in 6.2 surprising.*")
 
-md("The brief asks for **healthy vs diseased**. Collapsing the 38 classes to two, the",
-   "ensemble reaches **99.96%** — not a perfect 100%, because three of its 39 errors do",
-   "cross that boundary, and two of those are diseased leaves called healthy, which is",
-   "the costlier direction for a farmer:")
+md("Collapsed to **healthy vs diseased**, the ensemble reaches **99.96%** — not 100%,",
+   "because three of its 39 errors cross that boundary, two of them diseased leaves",
+   "called healthy, the costlier direction for a farmer:")
 
 code("import itertools",
     "def binary_accuracy(tag, n=8215):",
@@ -348,7 +316,7 @@ code("figure('confusion_matrix.png')")
 
 md("*The confusion matrix. The diagonal is essentially clean; red digits are the 39 misclassified images, three of which cross the healthy/diseased boundary.*")
 
-md("### 6.2 RQ2 — does that accuracy survive contact with reality? (E4–E7)",
+md("### 6.2 RQ2 — does that accuracy survive contact with reality?",
    "",
    "Four probes, each removing one comfort of the benchmark.")
 
@@ -375,12 +343,12 @@ code("if cam:",
     "if field:",
     "    print(f\"healthy/diseased binary on field images: {field['ensemble_binary']:.2f}%\")")
 
-md("**Reading the table.** The same leaves, with only the background masked out, cost",
-   "the ensemble tens of points; real field photographs cost it far more. Grad-CAM",
-   "explains why — a large share of the evidence the model uses lies outside the leaf.",
+md("The same leaves, background masked out, cost the ensemble tens of points; real",
+   "field photographs cost far more. Grad-CAM explains why — a large share of the",
+   "evidence lies outside the leaf.",
    "",
-   "We also tested whether this can be patched at inference (E7): horizontal-flip TTA",
-   "and AdaBN (recomputing BatchNorm statistics on the field images).")
+   "Can it be patched at inference? Horizontal-flip TTA, and AdaBN (recomputing",
+   "BatchNorm statistics on the field images):")
 
 code("ad = load('adaptation_probe.json')",
     "if ad:",
@@ -389,26 +357,24 @@ code("ad = load('adaptation_probe.json')",
     "else:",
     "    print('run: python -m scripts.audit --probe adaptation')")
 
-md("**Neither test-time fix helps — both make it worse.** TTA costs 0.4 points and AdaBN",
-   "0.9; recomputing BatchNorm statistics on the target domain, which repairs an ordinary",
-   "covariate shift, actively hurts here. That is the informative part: the failure is a",
-   "**learned shortcut**, not a distribution-statistics mismatch, so nothing applied at",
-   "inference can repair it and it has to be fixed during training.")
+md("**Neither helps — both make it worse.** TTA costs 0.4 points, AdaBN 0.9. AdaBN",
+   "repairs an ordinary covariate shift, so its failure is the informative part: this is",
+   "a **learned shortcut**, not a statistics mismatch, and nothing applied at inference",
+   "can repair it. It has to be fixed during training.")
 
 code("figure('lab_vs_field.png')")
 
 md("*The same ensemble on studio and field photographs: fine-grained accuracy collapses, and even the coarse healthy/diseased decision loses about twenty points.*")
 
-md("### 6.3 Closing the gap (E8–E11)",
+md("### 6.3 Closing the gap",
    "",
-   "Each row below is a training run; `p=0.0` is the control that separates *stronger",
-   "augmentation* from *removing the shortcut*.",
+   "Each row is a training run; `p=0.0` is the control separating *stronger augmentation*",
+   "from *removing the shortcut*.",
    "",
-   "> **Sample size.** The PlantDoc column here is the 236-image field **test split**,",
-   "> which is what `scripts/train.py` reports at the end of a run. Section 6.4 onward",
-   "> scores the same arms on **all 2,525** field images. The two bases differ by six to",
-   "> nine points and even reorder the arms, so numbers are never compared across them;",
-   "> every table states its own *n*.")
+   "> **Sample size.** The PlantDoc column here is the 236-image field **test split**.",
+   "> Section 6.4 onward scores the same arms on **all 2,525** field images. The two",
+   "> bases differ by six to nine points and even reorder the arms, so numbers are never",
+   "> compared across them; every table states its own *n*.")
 
 code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "        ('resnet18_color_strong_p70_224',  'background randomised p=0.7'),",
@@ -425,17 +391,15 @@ code("runs = [('resnet18_color_strong_p0_224',   'strong aug only (control)'),",
     "                 'epochs': len(h['history'])})",
     "pd.DataFrame(rows).set_index('setting') if rows else print('training still running')")
 
-md("A drop in the PlantVillage column is **expected and acceptable**: it is the price",
-   "of giving up the shortcut. The column that matters for the brief's stated purpose",
-   "is PlantDoc — and note that grayscale, which scores ~98% in the lab, collapses in",
-   "the field: colour is doing work the lab never tests.")
+md("A drop in the PlantVillage column is **expected**: it is the price of giving up the",
+   "shortcut. The column that matters is PlantDoc — and grayscale, at ~98% in the lab,",
+   "collapses in the field, so colour is doing work the lab never tests.")
 
-md("### 6.4 The clearest control — 574x the parameters, no field gain (E15)",
+md("### 6.4 The clearest control — 574x the parameters, no field gain",
    "",
-   "The strongest single result. We train **only the 19,494-parameter head** and leave",
-   "the 11.2M-parameter ImageNet backbone frozen, versus fine-tuning everything. Crossed",
-   "with background randomisation, it is a 2x2 factorial, scored on all 2,525 field",
-   "images (E16).")
+   "We train **only the 19,494-parameter head** with the 11.2M-parameter backbone frozen,",
+   "versus fine-tuning everything. Crossed with background randomisation: a 2x2",
+   "factorial, scored on all 2,525 field images.")
 
 code("import numpy as np",
     "arms = [('bg_control','full fine-tune, p=0.0'), ('bg_random','full fine-tune, p=0.7'),",
@@ -450,22 +414,22 @@ code("import numpy as np",
     "    rows.append({'arm': label, 'trainable params': f\"{h['trainable_parameters']:,}\",",
     "                 'PlantVillage': round(h['test_metrics']['accuracy']*100,2),",
     "                 'PlantDoc 38-way': d['ensemble'], 'crop': d['ensemble_crop']})",
-    "pd.DataFrame(rows).set_index('arm') if rows else print('E15/E16 pending')")
+    "pd.DataFrame(rows).set_index('arm') if rows else print('frozen-backbone arms pending')")
 
 md("Freezing the backbone costs ~8 points of PlantVillage accuracy and **matches or",
    "beats** full fine-tuning in the field. The lab points that 574x more trainable",
-   "parameters buy are worth nothing — often less than nothing — outside the benchmark.",
-   "This decouples the two accuracies with a direct control, not an inference.")
+   "parameters buy are worth nothing outside the benchmark — a direct control, not an",
+   "inference.")
 
 code("figure('frozen_vs_full.png')")
 
 md("*The strongest control: training 574x fewer parameters costs about eight points in the laboratory and loses nothing in the field.*")
 
-md("### 6.5 Where the field accuracy goes, and how much data closes it (E11, E16, E18)",
+md("### 6.5 Where the field accuracy goes, and how much data closes it",
    "",
    "Field accuracy factorises as *crop identification x diagnosis given the crop*. The",
    "bottleneck is recognising the plant, not the disease. Supervised adaptation is the",
-   "honest fix — and reported separately, because it uses target-domain labels.")
+   "honest fix, reported separately because it uses target-domain labels.")
 
 code("# decompose the BEST zero-shot arm on the 2,525-image basis, chosen by 38-way accuracy",
     "arms = {'strong aug only': 'bg_control', 'background randomised': 'bg_random',",
@@ -494,12 +458,12 @@ code("figure('adaptation_curve.png')")
 
 md("*Supervised adaptation, the honest remedy: 16.1% zero-shot to 55.9% with the full field training set.*")
 
-md("### 6.6 RQ3 — severity from image features (E12–E14, E26)")
+md("### 6.6 RQ3 — severity from image features")
 
 code("sev = load('severity_probe.json')",
     "val = load('severity_validation.json')",
     "if sev:",
-    "    print('E12 — leaf segmentation quality (unsupervised HSV mask vs the official mask):')",
+    "    print('leaf segmentation quality (unsupervised HSV mask vs the official mask):')",
     "    print(f\"  Dice mean {sev['leaf_segmentation_dice_mean']:.3f} | \"",
     "          f\"median {sev['leaf_segmentation_dice_median']:.3f} | \"",
     "          f\"{100*sev['leaf_segmentation_dice_below_0.5']:.0f}% of leaves below 0.5\")",
@@ -519,42 +483,41 @@ code("sev = load('severity_probe.json')",
     "                  f\"-- about {100*cal/ceil:.0f}% of the human ceiling\")",
     "joint = load('joint_severity.json')",
     "if joint:",
-    "    print(f\"\\njoint-trained severity head (E26): within-class rho {joint['within_class_rho_head']:.3f} \"",
+    "    print(f\"\\njoint-trained severity head: within-class rho {joint['within_class_rho_head']:.3f} \"",
     "          f\"vs Otsu {joint['within_class_rho_otsu']:.3f}, classification {joint['classification_accuracy']:.2f}%\")")
 
-md("Three findings, reported honestly:",
+md("Three findings:",
    "",
-   "- **Presence** (E13): the lesion-area ratio separates healthy from diseased at",
-   "  AUC 0.87 with official masks — a real image feature, no labels needed.",
-   "- **Grade** (E14): three annotators agree at quadratic kappa ~0.63 (the ceiling).",
-   "  The lesion-ratio grade tracks their consensus at kappa 0.30 with the rubric",
-   "  bands, rising to **0.47 under cross-validated recalibration** — a *moderate*",
-   "  proxy reaching ~74% of the human ceiling, honestly not matching it.",
-   "- **Expanding the model (E26).** A severity head *probed* on frozen classification",
-   "  features manages only within-class rho 0.38 — classification training discards the",
-   "  colour/texture detail severity needs. But trained **jointly** with the classifier,",
-   "  the head reproduces the official mask almost perfectly (within-class rho **0.957**)",
-   "  at no classification cost, and beats both classical estimators on human agreement",
-   "  (rho 0.47 vs Otsu 0.43). Severity is now a genuine model output, no mask needed at",
-   "  inference — though all lesion-area methods plateau near the human ceiling.")
+   "- **Presence.** The lesion-area ratio separates healthy from diseased at AUC 0.87",
+   "  with official masks — a real image feature, no labels needed.",
+   "- **Grade.** Three annotators agree at quadratic kappa ~0.63 — the ceiling. The",
+   "  lesion-ratio grade tracks their consensus at kappa 0.30, rising to **0.47 under",
+   "  cross-validated recalibration**: a moderate proxy at ~74% of the human ceiling,",
+   "  not matching it.",
+   "- **Expanding the model.** A severity head *probed* on frozen classification features",
+   "  manages only within-class rho 0.38 — classification training discards the",
+   "  colour/texture detail severity needs. Trained **jointly**, the same head reproduces",
+   "  the official mask at within-class rho **0.957** with no classification cost, and",
+   "  beats both classical estimators on human agreement (rho 0.47 vs Otsu 0.43).",
+   "  Severity is now a model output, no mask needed at inference.")
 
 code("figure('severity.png')")
 
 md("*Severity. Left: the grade against three annotators, with their mutual agreement as the ceiling. Right: trained jointly with the classifier, severity becomes a model output that beats the classical estimator.*")
 
-md("A caution on the E25 probe. Its **AUC of 0.936 looks excellent and is misleading**:",
-   "healthy-versus-diseased is largely answerable from class identity, and a head reading",
-   "classifier features can name the class and emit that class's typical lesion ratio",
-   "without ever measuring the leaf in front of it. Within a single class — where class",
-   "identity carries no information — it reaches only rho 0.380 against the classical",
-   "estimator's 0.784. That gap is why we report within-class correlation rather than AUC.")
+md("One caution on the probed head. Its **AUC of 0.936 looks excellent and is",
+   "misleading**: healthy-versus-diseased is largely answerable from class identity, so a",
+   "head reading classifier features can name the class and emit that class's typical",
+   "lesion ratio without ever measuring the leaf in front of it. Within a single class it",
+   "reaches only rho 0.380 against the classical estimator's 0.784. That gap is why we",
+   "report within-class correlation rather than AUC.")
 
 # ---------------------------------------------------- 6.7 negative and secondary results
-md("### 6.7 Results that did not work, and the deployment profile (E17, E21)",
+md("### 6.7 Results that did not work, and the deployment profile",
    "",
-   "Two arms produced negative results. They are reported because the pre-registered",
-   "falsification conditions in [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md) said they",
-   "would be; E7's negative result is in Section 6.2, where it belongs.")
+   "Two arms produced negative results, reported because the pre-registered falsification",
+   "conditions in [`docs/EXPERIMENTS.md`](../docs/EXPERIMENTS.md) said they would be. The",
+   "TTA/AdaBN negative is in 6.2, where it belongs.")
 
 code("pair = load('paired_bg_random_vs_hier.json')",
     "if pair:",
@@ -570,14 +533,13 @@ code("pair = load('paired_bg_random_vs_hier.json')",
     "    display(pd.DataFrame(rows).set_index('task'))",
     "    print(f\"paired on the same {pair['n']:,} field images; both arms use background randomisation\")")
 
-md("**E17 — the hierarchical head is rejected (H9).** The decomposition in Section 6.5",
-   "showed that crop identification is the bottleneck, so making crop an explicit",
-   "sub-problem was predicted to lift crop accuracy towards ~60% and overall accuracy to",
-   "~31%. It gains 0.84 points on crop — 21 images out of 325 discordant ones, p = 0.27,",
-   "indistinguishable from chance — leaves 38-way flat (p = 0.94), and loses 71 images on",
+md("**The hierarchical head is rejected.** Since 6.5 showed crop identification is the",
+   "bottleneck, making crop an explicit sub-problem was predicted to lift crop accuracy",
+   "towards ~60% and overall to ~31%. It gains 0.84 points on crop — 21 images of 325",
+   "discordant, p = 0.27 — leaves 38-way flat (p = 0.94), and loses 71 images on",
    "healthy/diseased, which *is* significant and in the wrong direction. It also finishes",
-   "below simply freezing the backbone (16.79% against 18.06%). The pre-registered",
-   "magnitude condition is not met, so H9 is recorded as rejected rather than softened.")
+   "below simply freezing the backbone (16.79% vs 18.06%). The pre-registered magnitude",
+   "condition is not met, so the hypothesis is recorded as rejected rather than softened.")
 
 code("rob = load('field_robustness.json')",
     "if rob:",
@@ -591,19 +553,16 @@ code("rob = load('field_robustness.json')",
     "else:",
     "    print('run: python -m scripts.field_robustness')")
 
-md("**E21 — strong augmentation buys no robustness to capture quality (H11 rejected), but",
-   "the finding is more useful than the hypothesis.** Field images were split into thirds",
-   "by luminance, contrast and sharpness. Accuracy is flat across luminance and contrast",
-   "for both arms (every gap under 1.6 points, and the sign is inconsistent). Sharpness is",
-   "the one axis that moves — and it moves the *wrong* way: the strong-augmentation arm",
-   "gains 3.7 points from blurry to sharp where the standard arm gains 0.1, so heavier",
-   "augmentation made it **more** sensitive to blur, not less.",
+md("**Strong augmentation buys no robustness to capture quality.** Field images were split",
+   "into thirds by luminance, contrast and sharpness. Accuracy is flat across luminance",
+   "and contrast for both arms (every gap under 1.6 points, sign inconsistent). Sharpness",
+   "is the one axis that moves, and it moves the *wrong* way: the strong-augmentation arm",
+   "gains 3.7 points from blurry to sharp where the standard arm gains 0.1.",
    "",
-   "The useful part is what this rules out. Bright, dark and low-contrast photographs are",
-   "classified about as badly as clean ones, so the ~16% field accuracy is **not caused by",
-   "poor photography** — no amount of telling farmers to hold the camera steadier would",
-   "recover it. What remains is the compositional gap: whole plants instead of one detached",
-   "leaf, overlapping foliage, and varying scale.")
+   "What this rules out is more useful than the hypothesis. Bright, dark and low-contrast",
+   "photographs are classified about as badly as clean ones, so the ~16% field accuracy is",
+   "**not caused by poor photography**. What remains is the compositional gap: whole plants",
+   "instead of one detached leaf, overlapping foliage, varying scale.")
 
 code("eff = load('efficiency_probe.json')",
     "if eff:",
@@ -614,24 +573,20 @@ code("eff = load('efficiency_probe.json')",
     "    print(f\"measured on {eff.get('device')} at {eff.get('image_size')}x{eff.get('image_size')}\")")
 
 md("**Deployment profile.** MobileNet-V2 stores in 9.3 MB against ResNet-18's 44.9 MB and",
-   "scores *higher* in the laboratory (99.46% vs 99.33%), so on size alone it is the",
-   "sensible thing to ship. Its GPU latency is worse, not better — 2.68 ms against 1.40 ms —",
-   "because depthwise-separable convolutions trade arithmetic for memory traffic, which a",
-   "GPU is the wrong device to reward; the parameter count is a size argument, not a speed",
-   "one. All three run far faster than any farmer would notice.",
+   "scores *higher* in the laboratory (99.46% vs 99.33%), so on size it is the sensible",
+   "thing to ship. Its GPU latency is worse, not better — 2.68 ms against 1.40 ms — because",
+   "depthwise-separable convolutions trade arithmetic for memory traffic, which a GPU is",
+   "the wrong device to reward. Parameter count is a size argument, not a speed one.",
    "",
-   "The sharper efficiency result is E15's: a frozen backbone with a 19,494-parameter linear",
-   "head is **78 KB per crop** on top of one shared backbone — 574× fewer trainable",
-   "parameters than fine-tuning — and it loses nothing in the field, where it is in fact the",
-   "better model.")
+   "The sharper result is 6.4's: a frozen backbone with a 19,494-parameter head is **78 KB",
+   "per crop** on top of one shared backbone, and loses nothing in the field.")
 
 # ------------------------------------------------------- 6.8 end-to-end example
 md("### 6.8 End to end: what the system returns for one leaf",
    "",
-   "Everything above is aggregate. This runs the delivered model — the jointly trained",
-   "network from E26 — over held-out test leaves it has never seen, and prints what a",
-   "user would actually receive: crop, condition, healthy/diseased, confidence, and a",
-   "severity grade produced by the network itself rather than by a mask.")
+   "Everything above is aggregate. This runs the delivered jointly-trained network over",
+   "held-out test leaves and prints what a user would receive: crop, condition,",
+   "healthy/diseased, confidence, and a severity grade from the network itself.")
 
 code("import torch.nn.functional as F",
     "from PIL import Image",
@@ -677,93 +632,67 @@ code("import torch.nn.functional as F",
     "else:",
     "    print('run: python -m scripts.train_joint')")
 
-md("Each caption is one complete answer to the brief: the crop, its condition, the",
-   "healthy/diseased verdict, a confidence, and a severity grade — all from a single",
-   "forward pass through one network, using the same rubric bands",
-   "(`src.audit.severity.severity_level`) as every severity number above.",
+md("Each caption is a complete answer to the brief from one forward pass. Three honest",
+   "observations:",
    "",
-   "Three honest observations from these six.",
-   "",
-   "1. The grade is deliberately **not** gated on the predicted class — it is read straight",
-   "   off the regression head, so a leaf called healthy that carries visible lesions is",
-   "   still graded, which is what you want when the classifier is the part that is wrong.",
-   "2. The healthy leaves come back at a few percent lesion area rather than zero, landing",
-   "   in *mild* rather than *healthy*. That is not a bug in the head — it is faithfully",
-   "   reproducing its target, and the official masks themselves give healthy leaves a mean",
-   "   ratio of 0.039 (Section 6.6). Leaf edge, shadow and specular highlight fall outside",
-   "   the healthy-green hue band. It is why the rubric's lowest threshold is 0.005 and not 0.",
-   "3. The yellow-leaf-curl leaf is graded *mild* at 0.8% while looking obviously sick. It",
-   "   is right about the area and wrong about the plant: that virus deforms and discolours",
-   "   the whole leaf instead of producing lesions. **Lesion area is the wrong measure for",
-   "   this disease**, and no amount of better regression fixes that — it is a limit of the",
-   "   definition of severity, which is the honest reading of the kappa ceiling in E14.")
+   "1. The grade is deliberately **not** gated on the predicted class, so a leaf called",
+   "   healthy that carries visible lesions is still graded — what you want when the",
+   "   classifier is the part that is wrong.",
+   "2. Healthy leaves come back at a few percent rather than zero, landing in *mild*. The",
+   "   head is reproducing its target faithfully: official masks give healthy leaves a mean",
+   "   ratio of 0.039 (6.6), because leaf edge, shadow and highlight fall outside the",
+   "   healthy-green hue band. Hence a lowest threshold of 0.005, not 0.",
+   "3. The yellow-leaf-curl leaf grades *mild* at 0.8% while looking obviously sick — right",
+   "   about the area, wrong about the plant. That virus deforms the whole leaf instead of",
+   "   producing lesions, so **lesion area is the wrong measure for this disease**. Better",
+   "   regression cannot fix a limit of the definition.")
 
 # ------------------------------------------------------------- 7. Discussion
 md("## 7. Discussion",
    "",
-   "### What the numbers mean",
-   "",
-   "On the benchmark the task is solved: the ensemble reaches **99.53%** over 38 classes",
-   "and **99.96%** on the healthy/diseased decision the brief actually asks for. Taken",
-   "alone, that would be a finished project — and it is exactly the result the",
-   "literature has reported since Mohanty et al. (2016).",
-   "",
-   "The audit shows that number is not what it appears. Background pixels alone",
-   "predict the class far above chance; masking the background costs tens of points on",
-   "the *same leaves*; Grad-CAM puts a large minority of the evidence outside the leaf;",
-   "and on real field photographs the model collapses. These four probes agree, and",
-   "they agree with the published critiques of this dataset (Noyan, 2022; Singh et al.,",
-   "2020).",
-   "",
-   "### Strengths",
-   "",
-   "- Every number comes from **one fixed split**, shared by all models and all dataset",
-   "  variants, so the comparisons are internally valid.",
-   "- The ensemble weights are tuned on validation only, never on test.",
-   "- Each claim about the shortcut is supported by **more than one independent probe**.",
-   "- Severity is validated in two ways that need no manual labels, plus manual grades.",
+   "The four probes agree with each other, and with the published critiques of this",
+   "dataset (Noyan, 2022; Singh et al., 2020). Internal validity rests on one fixed split",
+   "shared by every model and variant, ensemble weights tuned on validation only, and",
+   "each shortcut claim supported by more than one probe.",
    "",
    "### Limitations and threats to validity",
    "",
    "| Limitation | Why it matters | How we handled it |",
    "|---|---|---|",
-   "| The `segmented` evaluation puts a black background the model never saw during training | conflates *losing the shortcut* with *a new domain shift* | trained a model **on** `segmented` (E9) as the clean control |",
-   "| PlantDoc is web-scraped | label noise; its train/test splits differ in content | reported as an external benchmark, with the known caveat |",
-   "| The field test split is 236 images | ±5 points at 95% confidence | also reported on the full ~2,600 images |",
-   "| Severity has no ground truth in PlantVillage | grades cannot be verified directly | validated by separation (AUC) and by three human annotators (E14) |",
-   "| Severity is only a moderate proxy for human grades | lesion area is not all humans judge | recalibrated by cross-validation to ~74% of the human ceiling, and reported as the honest ceiling |",
-   "| Ensemble members share one training set | their errors are correlated, limiting the gain | quantified rather than assumed |",
+   "| The `segmented` evaluation puts a black background the model never saw in training | conflates *losing the shortcut* with *a new domain shift* | trained a model **on** `segmented` as the clean control |",
+   "| PlantDoc is web-scraped | label noise; its train/test splits differ in content | reported as an external benchmark, with the caveat |",
+   "| The field test split is 236 images | ±5 points at 95% confidence | also reported on all 2,525 images |",
+   "| Severity has no ground truth in PlantVillage | grades cannot be verified directly | validated by separation (AUC) and by three human annotators |",
+   "| Severity is only a moderate proxy for human grades | lesion area is not all humans judge | recalibrated to ~74% of the human ceiling, reported as the ceiling |",
+   "| Ensemble members share one training set | correlated errors limit the gain | quantified rather than assumed |",
    "",
    "### What would change our conclusions",
    "",
-   "If the background probe had scored near chance and Grad-CAM had concentrated on",
-   "the leaf, we would have accepted the 99.5% at face value. If the `p=0.0` control",
-   "matched `p=0.7` on field images, the improvement would be attributable to",
-   "augmentation alone rather than to removing the shortcut.")
+   "If the background probe had scored near chance and Grad-CAM had concentrated on the",
+   "leaf, we would have accepted the 99.5% at face value. If the `p=0.0` control matched",
+   "`p=0.7` in the field, the improvement would be attributable to augmentation alone.")
 
 # ------------------------------------------------------------- 8. Conclusion
 md("## 8. Conclusion",
    "",
-   "Against the brief, both tasks are delivered:",
+   "Both tasks are delivered:",
    "",
-   "- **Task 1 — classification.** Three CNN baselines and a validation-tuned",
-   "  soft-voting ensemble; healthy vs diseased is solved at **99.96%** on the held-out",
-   "  leaf-grouped split, and 38-way fine-grained accuracy is **99.53%**.",
-   "- **Task 2 — severity from image features.** A lesion-area estimator validated",
-   "  against three human annotators, and — trained jointly with the classifier — a",
-   "  severity head that makes severity a genuine model output (within-class rho 0.957).",
+   "- **Task 1 — classification.** Three CNN baselines and a validation-tuned soft-voting",
+   "  ensemble: **99.96%** healthy vs diseased, **99.53%** over 38 classes, on the",
+   "  held-out leaf-grouped split.",
+   "- **Task 2 — severity.** A lesion-area estimator validated against three human",
+   "  annotators, and a jointly-trained head that makes severity a model output",
+   "  (within-class rho 0.957).",
    "",
-   "Beyond the brief, we tested whether the system would serve the farmer the brief",
-   "describes, and found that it would not: the laboratory accuracy is substantially an",
-   "artefact of dataset capture bias, and it does not transfer to field photographs.",
-   "We localised the cause with four independent probes, showed that inference-time",
-   "fixes cannot repair it, and measured how far training-time interventions close the",
-   "gap.",
+   "Beyond the brief, the system would not serve the farmer the brief describes: the",
+   "laboratory accuracy is substantially an artefact of capture bias and does not transfer",
+   "to the field. We localised the cause, showed inference-time fixes cannot repair it,",
+   "and measured how far training-time interventions close the gap.",
    "",
-   "**Future work.** Train on in-field imagery such as PlantDoc or FieldPlant; replace",
-   "the hue-band lesion rule with a segmentation model trained on annotated lesions;",
-   "calibrate the severity thresholds against expert grades; and report field accuracy",
-   "alongside benchmark accuracy as standard practice.",
+   "**Future work.** Train on in-field imagery such as PlantDoc or FieldPlant; replace the",
+   "hue-band lesion rule with a learned lesion segmentation model; calibrate severity",
+   "thresholds against expert grades; and report field accuracy alongside benchmark",
+   "accuracy as standard practice.",
    "",
    "### References",
    "",
